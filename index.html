@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AltDoc</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="appShell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <img src="icon.svg" alt="" />
+          </span>
+          <div>
+            <h1>AltDoc</h1>
+            <p>Capture raw thinking. Build it into serious long-form writing.</p>
+          </div>
+        </div>
+        <nav class="marketing-nav" aria-label="Homepage sections">
+          <a href="#what-it-does">AltDoc's approach</a>
+          <a href="#who-for">Who it's for</a>
+          <a href="#how-it-works">How it works</a>
+        </nav>
+        <div class="topbar-actions">
+          <span class="plan-label">Private beta</span>
+          <label class="search-control" aria-label="Search project">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6" />
+              <path d="m16 16 4 4" />
+            </svg>
+            <input type="search" placeholder="Search project..." />
+          </label>
+          <span class="truth-label">Prototype: transcripts and AI outputs are stubbed</span>
+          <button class="secondary-action topbar-cta" id="topbarStartButton" type="button">
+            Get started
+          </button>
+          <button class="icon-button" id="resetButton" type="button" aria-label="Reset demo">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4.75 12a7.25 7.25 0 1 0 2.12-5.12M4.75 5.5v4.25H9" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="homepage" id="homeScreen">
+        <section class="home-hero" id="what-it-does">
+          <div class="hero-copy">
+            <span class="home-kicker">From raw ideas to argument-ready documents</span>
+            <h2>Capture messy thinking before it disappears. Shape it into a document you can trust.</h2>
+            <p>
+              AltDoc helps you capture the unstructured thoughts where original ideas often
+              begin, define what the final document should become, and close the gaps between
+              your raw material and a traceable, argument-ready draft.
+            </p>
+            <div class="hero-actions">
+              <button class="primary-action hero-button" id="homeStartButton" type="button">
+                Get started
+              </button>
+              <a class="secondary-link" href="#how-it-works">See how it works</a>
+            </div>
+          </div>
+
+          <div class="hero-product-shot workflow-visual" aria-label="AltDoc workflow preview">
+            <div class="workflow-header">
+              <span>AltDoc workspace</span>
+              <strong>Argument ready: 72%</strong>
+            </div>
+            <div class="workflow-canvas">
+              <div class="workflow-card input-card">
+                <span class="workflow-label">Inputs</span>
+                <strong>Voice notes</strong>
+                <div class="voice-note-row">
+                  <span class="voice-dot"></span>
+                  <div class="waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+                  <em>N1</em>
+                </div>
+                <div class="voice-note-row">
+                  <span class="voice-dot"></span>
+                  <div class="waveform short" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                  <em>N2</em>
+                </div>
+                <div class="domain-strip">
+                  <span>Domain context</span>
+                  <b>Chevron</b>
+                  <b>deference</b>
+                </div>
+              </div>
+
+              <div class="workflow-arrow" aria-hidden="true"></div>
+
+              <div class="workflow-card coach-card">
+                <span class="workflow-label">Coach</span>
+                <strong>Readiness coach</strong>
+                <div class="coach-meter">
+                  <span></span>
+                  <em>Missing counterargument</em>
+                </div>
+                <div class="coach-row good">Supported thesis</div>
+                <div class="coach-row warn">Record one more note</div>
+              </div>
+
+              <div class="workflow-arrow" aria-hidden="true"></div>
+
+              <div class="workflow-card draft-card">
+                <span class="workflow-label">Output</span>
+                <strong>Traceable draft</strong>
+                <p>
+                  Algorithmic systems shift review toward reasoned decision-making.
+                </p>
+                <div class="source-links">
+                  <span>N1</span>
+                  <span>N2</span>
+                  <span>Context</span>
+                </div>
+              </div>
+            </div>
+            <div class="workflow-footer">
+              <span>Raw ideas</span>
+              <span>Guided readiness</span>
+              <span>Traceable draft</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="problem-section">
+          <div class="section-intro centered">
+            <span class="section-kicker">Problem</span>
+            <h2>Great ideas get stuck between speaking and writing.</h2>
+            <p>
+              The most original ideas often show up before they are organized enough to write.
+              Voice makes them easy to capture, but hard to structure, evaluate, and turn into a
+              finished document.
+            </p>
+          </div>
+          <div class="audience-grid">
+            <article>
+              <strong>Notes live in silos</strong>
+              <p>Voice memos, transcripts, reading reactions, and meeting thoughts pile up without a shared project structure.</p>
+            </article>
+            <article>
+              <strong>It's hard to see what matters</strong>
+              <p>Strong ideas are mixed with repetition, uncertainty, loose references, and unsupported jumps.</p>
+            </article>
+            <article>
+              <strong>Drafting starts too early</strong>
+              <p>Generic writing tools can make incomplete thinking sound finished before the argument is actually ready.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="what-section">
+          <div class="section-intro centered">
+            <span class="section-kicker">AltDoc's approach</span>
+            <h2>Guide raw ideas toward the document they need to become.</h2>
+          </div>
+          <div class="value-grid">
+            <article>
+              <strong>Understands your target</strong>
+              <p>Define the document you want: thesis section, strategy memo, policy brief, research memo, or investor narrative.</p>
+            </article>
+            <article>
+              <strong>Captures pre-draft reasoning</strong>
+              <p>Use voice to preserve half-formed connections, objections, mechanisms, and moments of synthesis before they disappear.</p>
+            </article>
+            <article>
+              <strong>Shows what is missing</strong>
+              <p>AltDoc identifies supported claims, weak spots, contradictions, and the next notes you should capture.</p>
+            </article>
+            <article>
+              <strong>Creates traceable writing</strong>
+              <p>Generate draft sections with clear links back to the notes, context, and examples that support them.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="audience-section" id="who-for">
+          <div class="section-intro centered">
+            <span class="section-kicker">Who it is for</span>
+            <h2>Built for people whose best ideas arrive before the draft exists.</h2>
+            <p>
+              For researchers, founders, analysts, and operators working on high-context documents
+              where structure, evidence, and trust matter.
+            </p>
+          </div>
+          <div class="audience-grid">
+            <article>
+              <strong>Graduate researchers</strong>
+              <p>Turn reading reactions, advisor notes, and half-formed claims into thesis sections.</p>
+            </article>
+            <article>
+              <strong>Policy and research analysts</strong>
+              <p>Move from field observations and source notes to defensible memos and briefs.</p>
+            </article>
+            <article>
+              <strong>Founders and operators</strong>
+              <p>Convert scattered strategy thoughts into internal narratives with clear gaps.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="how-section" id="how-it-works">
+          <div class="section-intro centered">
+            <span class="section-kicker">How it works</span>
+            <h2>How it works</h2>
+            <p>Capture raw thoughts, define the target document, and let AltDoc guide the material toward readiness.</p>
+          </div>
+          <div class="step-grid">
+            <article class="step-card">
+              <div class="step-card-top">
+                <span class="step-number">01</span>
+                <span class="step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M7 3.75h7.25L19 8.5v11.75H7z" />
+                    <path d="M14 3.75V8.5H19" />
+                    <path d="M10 12h6M10 15h5M10 18h3" />
+                  </svg>
+                </span>
+              </div>
+              <h3>Define the target document</h3>
+              <p>Tell AltDoc what you are trying to create, who it is for, what good looks like, and what context matters.</p>
+              <div class="mini-screenshot setup-shot">
+                <div class="step-illustration setup-illustration" aria-hidden="true">
+                  <div class="illustration-icon large">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M6.5 3.75h7.25L18.5 8.5v11.75h-12z" />
+                      <path d="M13.75 3.75V8.5h4.75" />
+                      <path d="M9.25 12.25h6M9.25 15.25h5M9.25 18.25h3.25" />
+                    </svg>
+                  </div>
+                  <div class="context-stack">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <div class="context-chips"><span></span><span></span><span></span></div>
+                </div>
+              </div>
+            </article>
+            <article class="step-card">
+              <div class="step-card-top">
+                <span class="step-number">02</span>
+                <span class="step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 3.75a3 3 0 0 0-3 3v5.5a3 3 0 0 0 6 0v-5.5a3 3 0 0 0-3-3Z" />
+                    <path d="M5.75 11.5a6.25 6.25 0 0 0 12.5 0M12 17.75v2.5M8.75 20.25h6.5" />
+                  </svg>
+                </span>
+              </div>
+              <h3>Capture raw thinking</h3>
+              <p>Add voice notes, transcripts, reading reactions, meeting thoughts, or quick reflections while the ideas are still forming.</p>
+              <div class="mini-screenshot notes-shot">
+                <div class="step-illustration notes-illustration" aria-hidden="true">
+                  <div class="illustration-icon large mic">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 3.75a3 3 0 0 0-3 3v5.5a3 3 0 0 0 6 0v-5.5a3 3 0 0 0-3-3Z" />
+                      <path d="M5.75 11.5a6.25 6.25 0 0 0 12.5 0M12 17.75v2.5M8.75 20.25h6.5" />
+                    </svg>
+                  </div>
+                  <div class="big-waveform">
+                    <i></i><i></i><i></i><i></i><i></i><i></i>
+                  </div>
+                  <div class="voice-files">
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <article class="step-card">
+              <div class="step-card-top">
+                <span class="step-number">03</span>
+                <span class="step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M6.75 4.25h10.5v15.5H6.75z" />
+                    <path d="M9.75 8h4.5M9.75 11h4M9.75 14h2.25" />
+                    <path d="m14.25 16.25 1.35 1.35 2.9-3.1" />
+                  </svg>
+                </span>
+              </div>
+              <h3>Close the gaps</h3>
+              <p>AltDoc maps your notes into claims, evidence, objections, open questions, and follow-up prompts before producing a traceable draft.</p>
+              <div class="mini-screenshot draft-readiness-shot">
+                <div class="step-illustration draft-illustration" aria-hidden="true">
+                  <div class="draft-page">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <div class="source-dots"><i></i><i></i><i></i></div>
+                  </div>
+                  <div class="readiness-badge">
+                    <div class="mini-score small"></div>
+                    <svg viewBox="0 0 24 24">
+                      <path d="m7.5 12.5 3 3 6.5-7" />
+                    </svg>
+                  </div>
+                  <div class="readiness-bars"><span></span><span></span></div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <main class="flow-screen is-hidden" id="flowScreen">
+        <section class="flow-shell">
+          <div class="flow-progress">
+            <span id="flowStepLabel">Step 1 of 6</span>
+            <div class="progress-track"><span id="flowProgressBar"></span></div>
+          </div>
+
+          <section class="flow-step" data-flow-step="0">
+            <span class="home-kicker">Start with context</span>
+            <h2>What are you working on?</h2>
+            <p>Describe the document you want to create. AltDoc uses this intent to interpret the voice notes that follow.</p>
+            <textarea id="flowIntent" rows="6"></textarea>
+            <label class="field-label" for="flowOutputShape">Target document</label>
+            <select id="flowOutputShape">
+              <option>Research memo</option>
+              <option>Thesis section</option>
+              <option>Policy brief</option>
+              <option>Strategy narrative</option>
+              <option>Other</option>
+            </select>
+            <div class="conditional-field" id="flowOtherOutputWrap">
+              <label class="field-label" for="flowOtherOutput">Describe the target document</label>
+              <input
+                id="flowOtherOutput"
+                class="text-input"
+                type="text"
+                placeholder="e.g. grant proposal, book chapter, investor memo"
+              />
+            </div>
+          </section>
+
+          <section class="flow-step is-hidden" data-flow-step="1">
+            <span class="home-kicker">Add voice notes</span>
+            <h2>Import the voice notes for this project.</h2>
+            <p>Import the voice notes at this step, after which the transcription will happen.</p>
+            <div class="flow-upload-card">
+              <strong>Voice notes loaded</strong>
+              <div id="flowVoiceNotes" class="flow-file-list"></div>
+              <div class="upload-actions">
+                <input
+                  id="flowVoiceUpload"
+                  class="visually-hidden-file"
+                  type="file"
+                  accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.txt,.md"
+                  multiple
+                />
+                <button class="secondary-action" id="flowUploadVoiceButton" type="button">Upload voice notes</button>
+                <button class="secondary-action" id="flowAddVoiceButton" type="button">Use sample voice notes</button>
+              </div>
+              <p class="subtle-copy" id="flowUploadStatus">Prototype note: uploaded files are listed locally; transcription is stubbed.</p>
+            </div>
+          </section>
+
+          <section class="flow-step is-hidden" data-flow-step="2">
+            <span class="home-kicker">Define good output</span>
+            <h2>What should a strong document look like?</h2>
+            <p>Link or import examples so AltDoc can infer structure, tone, evidence style, and paragraph roles.</p>
+            <div class="flow-upload-card">
+              <strong>Suggested Templates</strong>
+              <p class="subtle-copy">Select a few templates AltDoc should use as output references. Click any template to preview the document shape.</p>
+              <div id="flowExamples" class="example-list"></div>
+              <div class="additional-context">
+                <strong>Additional Context</strong>
+                <section class="context-source">
+                  <label class="field-label" for="flowExampleLinks">Links to additional docs for AltDoc to learn structure of the desired output</label>
+                  <textarea
+                    id="flowExampleLinks"
+                    rows="3"
+                    placeholder="Paste one document URL per line..."
+                  ></textarea>
+                </section>
+                <section class="context-source import-dropzone" id="flowExampleImport">
+                  <strong>Import examples for AltDoc to learn structure of the desired output</strong>
+                  <p>Drop in PDF, DOCX, Markdown, or text examples of documents you want AltDoc to emulate.</p>
+                  <input
+                    id="flowExampleUpload"
+                    class="visually-hidden-file"
+                    type="file"
+                    accept=".pdf,.doc,.docx,.md,.markdown,.txt"
+                    multiple
+                  />
+                  <label class="secondary-action file-action" id="flowUploadExampleButton" for="flowExampleUpload">Choose example files</label>
+                  <p class="subtle-copy" id="flowExampleUploadStatus">Prototype note: uploaded examples are listed locally; parsing is stubbed.</p>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section class="flow-step is-hidden" data-flow-step="3">
+            <span class="home-kicker">Prime the domain</span>
+            <h2>Any domain context AltDoc should know?</h2>
+            <p>This step is optional. Paste domain vocabulary or import context files so AltDoc can parse them and create a priming list for transcription accuracy.</p>
+            <label class="field-label" for="flowDomainSelect">Domain</label>
+            <select id="flowDomainSelect"></select>
+            <div class="start-preview">
+              <div>
+                <strong>Paste context words or notes</strong>
+                <textarea id="flowContextInput" rows="5" placeholder="Paste terms, names, concepts, citations, abbreviations, or rough notes that AltDoc should listen for..."></textarea>
+              </div>
+              <div>
+                <strong>Optional imports</strong>
+                <div class="context-imports">
+                  <input
+                    id="flowCsvGlossaryUpload"
+                    class="visually-hidden-file"
+                    type="file"
+                    accept=".csv,text/csv"
+                    multiple
+                  />
+                  <label class="secondary-action file-action" for="flowCsvGlossaryUpload">CSV glossary</label>
+                  <input
+                    id="flowMarkdownContextUpload"
+                    class="visually-hidden-file"
+                    type="file"
+                    accept=".md,.markdown,text/markdown,text/plain"
+                    multiple
+                  />
+                  <label class="secondary-action file-action" for="flowMarkdownContextUpload">Markdown files</label>
+                </div>
+                <p class="subtle-copy" id="flowContextImportStatus">No context files imported yet.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="flow-step is-hidden" data-flow-step="4">
+            <span class="home-kicker">Traceable draft</span>
+            <h2>Here is the current draft.</h2>
+            <p>Each paragraph links back to voice notes, project context, or target examples.</p>
+            <article class="draft-preview flow-output">
+              <div class="draft-toolbar">
+                <span>Current Draft</span>
+                <div class="draft-actions">
+                  <button class="secondary-action" id="flowSaveDraftButton" type="button">Save draft</button>
+                  <button class="secondary-action" id="flowGoogleDocsButton" type="button">Export to Google Docs</button>
+                  <button class="primary-action" id="flowDocxButton" type="button">Download .docx</button>
+                </div>
+              </div>
+              <div class="draft-viewer" aria-label="Current draft viewer">
+                <h3 id="flowDraftTitle"></h3>
+                <div id="flowDraftBody"></div>
+                <div id="flowDraftFootnotes" class="draft-footnotes"></div>
+              </div>
+              <p class="subtle-copy export-status" id="flowExportStatus">Traceability appears as footnotes in this viewer and export.</p>
+            </article>
+          </section>
+
+          <section class="flow-step is-hidden" data-flow-step="5">
+            <span class="home-kicker">Inspect readiness</span>
+            <h2>What is working, missing, or inconsistent?</h2>
+            <p>AltDoc reviews the draft before you treat it as finished.</p>
+            <div class="flow-readiness">
+              <div class="score-ring" aria-label="Readiness score">
+                <span id="flowScoreValue">0</span>
+                <small>/100</small>
+              </div>
+              <div class="thesis-block">
+                <span class="eyeless-label">Working well</span>
+                <p id="flowThesisText"></p>
+              </div>
+              <div class="readiness-grid">
+                <section>
+                  <h3>What is working</h3>
+                  <div id="flowSupportList" class="issue-list"></div>
+                </section>
+                <section>
+                  <h3>Missing or inconsistent</h3>
+                  <div id="flowGapList" class="issue-list"></div>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <div class="flow-actions">
+            <button class="secondary-action" id="flowBackButton" type="button">Back</button>
+            <button class="primary-action" id="flowNextButton" type="button">Continue</button>
+          </div>
+        </section>
+      </main>
+
+      <main class="start-screen is-hidden" id="startScreen">
+        <section class="start-copy">
+          <h2>Start a writing project before drafting</h2>
+          <p>
+            Define the intended document, prime the domain vocabulary, and load the accumulated
+            voice-note transcripts. The prototype then produces an argument readiness report and a
+            traceable draft.
+          </p>
+          <div class="workflow-steps" aria-label="Prototype workflow">
+            <span>1. Start project</span>
+            <span>2. Apply domain priming</span>
+            <span>3. Inspect readiness</span>
+            <span>4. Open traceable draft</span>
+          </div>
+          <div class="portal-principles">
+            <div>
+              <strong>Design System Output</strong>
+              <p>Intent, domain rules, target examples, evidence shape, and traceability model.</p>
+            </div>
+            <div>
+              <strong>Reasoning Engine</strong>
+              <p>Maps voice notes into claims, objections, gaps, and readiness checks.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="start-card">
+          <div class="section-heading">
+            <span>New Project</span>
+            <span class="tiny-status">Stubbed demo data</span>
+          </div>
+
+          <label class="field-label" for="startDomainSelect">Domain</label>
+          <select id="startDomainSelect"></select>
+
+          <label class="field-label" for="startOutputShape">Target output</label>
+          <select id="startOutputShape">
+            <option>Research memo</option>
+            <option>Thesis section</option>
+            <option>Policy brief</option>
+            <option>Strategy narrative</option>
+          </select>
+
+          <label class="field-label" for="startIntent">Intent</label>
+          <textarea id="startIntent" rows="4"></textarea>
+
+          <div class="start-preview">
+            <div>
+              <strong>Priming preview</strong>
+              <div id="startTermPreview" class="term-list"></div>
+            </div>
+            <div>
+              <strong>Loaded inputs</strong>
+              <p id="startInputSummary"></p>
+            </div>
+          </div>
+
+          <div class="readiness-checklist">
+            <div class="check-row is-done">
+              <span></span>
+              <p>Domain Rules selected before transcript interpretation</p>
+            </div>
+            <div class="check-row is-done">
+              <span></span>
+              <p>Target examples loaded as output schema</p>
+            </div>
+            <div class="check-row">
+              <span></span>
+              <p>Traceable Draft generated after readiness review</p>
+            </div>
+          </div>
+
+          <button class="primary-action start-button" id="startProjectButton" type="button">
+            Start project and analyze notes
+          </button>
+        </section>
+      </main>
+
+      <main class="workspace is-hidden" id="workspace">
+        <nav class="portal-nav" aria-label="Portal sections">
+          <a class="is-active" href="#workspace">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 11.5 12 5l8 6.5V20H4v-8.5Z" />
+              <path d="M9 20v-6h6v6" />
+            </svg>
+            Command Center
+          </a>
+          <a href="#projectIntent">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 4h10v16H7z" />
+              <path d="M10 8h4M10 12h4M10 16h2" />
+            </svg>
+            Projects
+          </a>
+          <a href="#noteList">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 4v10" />
+              <path d="M8 8v3a4 4 0 0 0 8 0V8" />
+              <path d="M6 14a6 6 0 0 0 12 0M12 20v-2" />
+            </svg>
+            Voice Notes
+          </a>
+          <a href="#coachTab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12a7 7 0 1 0 14 0 7 7 0 0 0-14 0Z" />
+              <path d="M12 8v4l3 2" />
+            </svg>
+            Readiness Coach
+          </a>
+          <a href="#draftTab">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 4h9l3 3v13H6z" />
+              <path d="M14 4v4h4M9 12h6M9 16h4" />
+            </svg>
+            Traceable Draft
+          </a>
+          <a href="#primingTerms">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 5h14v14H5z" />
+              <path d="M8 9h8M8 13h5M8 17h7" />
+            </svg>
+            Domain Rules
+          </a>
+          <div class="nav-project-card">
+            <strong>Start Project</strong>
+            <p>Create a project with domain priming, voice notes, and AI coaching.</p>
+            <button class="primary-action" type="button" id="navStartOverButton">New project</button>
+          </div>
+        </nav>
+        <aside class="project-panel">
+          <section class="panel-block">
+            <div class="section-heading">
+              <span>Project Context</span>
+            </div>
+            <label class="field-label" for="projectIntent">Intent</label>
+            <textarea id="projectIntent" rows="4"></textarea>
+
+            <label class="field-label" for="domainSelect">Domain</label>
+            <select id="domainSelect"></select>
+
+            <label class="field-label" for="outputShape">Target output</label>
+            <select id="outputShape">
+              <option>Research memo</option>
+              <option>Thesis section</option>
+              <option>Policy brief</option>
+              <option>Strategy narrative</option>
+            </select>
+          </section>
+
+          <section class="panel-block">
+            <div class="section-heading">
+              <span>Domain Priming</span>
+              <span class="tiny-status">Applied before interpretation</span>
+            </div>
+            <div id="primingTerms" class="term-list"></div>
+            <div class="priming-note">
+              <strong>Priming rule</strong>
+              <p id="primingRule"></p>
+            </div>
+          </section>
+
+          <section class="panel-block">
+            <div class="section-heading">
+              <span>Target Examples</span>
+              <span class="tiny-status">Schema source</span>
+            </div>
+            <div id="exampleList" class="example-list"></div>
+          </section>
+
+          <section class="panel-block">
+            <div class="section-heading">
+              <span>Reasoning Engine</span>
+              <span class="tiny-status ready-dot">Ready</span>
+            </div>
+            <div class="readiness-checklist compact">
+              <div class="check-row is-done">
+                <span></span>
+                <p>Interpretation mode follows domain rules</p>
+              </div>
+              <div class="check-row is-done">
+                <span></span>
+                <p>Contradiction check enabled</p>
+              </div>
+              <div class="check-row is-done">
+                <span></span>
+                <p>Evidence weighted by source tags</p>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <section class="notes-panel">
+          <div class="section-title-row">
+            <div>
+              <h2>Voice Notes</h2>
+              <p>Imported transcript cards, interpreted with the project glossary and domain context.</p>
+            </div>
+            <button class="primary-action" id="addNoteButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add suggested note
+            </button>
+          </div>
+
+          <div id="noteList" class="note-list"></div>
+        </section>
+
+        <section class="readiness-panel">
+          <div class="readiness-header">
+            <div>
+              <h2>Argument Readiness</h2>
+              <p id="readinessSubtitle"></p>
+            </div>
+            <div class="score-ring" aria-label="Readiness score">
+              <span id="scoreValue">0</span>
+              <small>/100</small>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Readiness views">
+            <button class="tab is-active" type="button" data-tab="coach">Coach</button>
+            <button class="tab" type="button" data-tab="map">Argument Map</button>
+            <button class="tab" type="button" data-tab="draft">Traceable Draft</button>
+          </div>
+
+          <div id="coachTab" class="tab-panel">
+            <div class="thesis-block">
+              <span class="eyeless-label">Emerging thesis</span>
+              <p id="thesisText"></p>
+            </div>
+
+            <div class="readiness-grid">
+              <section>
+                <h3>Strongest support</h3>
+                <div id="supportList" class="issue-list"></div>
+              </section>
+              <section>
+                <h3>Gaps and conflicts</h3>
+                <div id="gapList" class="issue-list"></div>
+              </section>
+            </div>
+
+            <section class="next-note">
+              <div>
+                <h3>Record this next</h3>
+                <p id="nextPrompt"></p>
+              </div>
+              <div class="next-note-actions">
+                <button class="secondary-action" id="resolveGapButton" type="button">Simulate follow-up note</button>
+                <button class="primary-action" id="openDraftButton" type="button">Open traceable draft</button>
+              </div>
+            </section>
+          </div>
+
+          <div id="mapTab" class="tab-panel is-hidden">
+            <div id="argumentMap" class="argument-map"></div>
+          </div>
+
+          <div id="draftTab" class="tab-panel is-hidden">
+            <article class="draft-preview">
+              <div class="draft-toolbar">
+                <span>Traceable Draft</span>
+                <span class="tiny-status">Every paragraph links to source notes</span>
+              </div>
+              <div id="draftBody"></div>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <aside class="example-drawer" id="exampleDrawer" aria-hidden="true" aria-label="Example document preview">
+        <div class="example-drawer-panel">
+          <button class="icon-button drawer-close" id="closeExampleDrawer" type="button" aria-label="Close example preview">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+          <div id="exampleDrawerContent"></div>
+        </div>
+      </aside>
+    </div>
+
+    <script src="app.js?v=inline-draft-editor-v1"></script>
+  </body>
+</html>
