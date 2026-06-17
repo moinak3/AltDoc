@@ -1226,7 +1226,7 @@ function legacyCopyDraftHtml(html, text) {
   return didCopy || legacyCopyText(text);
 }
 
-async function copyDraftForGoogleDocs() {
+function copyDraftForGoogleDocs() {
   const html = draftExportHtml();
   const text = draftExportText();
 
@@ -1235,18 +1235,16 @@ async function copyDraftForGoogleDocs() {
   }
 
   if (navigator.clipboard?.write && window.ClipboardItem) {
-    await navigator.clipboard.write([
+    return navigator.clipboard.write([
       new ClipboardItem({
         "text/html": new Blob([html], { type: "text/html" }),
         "text/plain": new Blob([text], { type: "text/plain" }),
       }),
-    ]);
-    return "rich";
+    ]).then(() => "rich");
   }
 
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return "plain";
+    return navigator.clipboard.writeText(text).then(() => "plain");
   }
 
   throw new Error("Clipboard export is unavailable");
@@ -1489,13 +1487,17 @@ async function exportDraftToGoogleDocs() {
   draftHasUnsavedChanges = false;
 
   try {
-    const copyMode = await copyDraftForGoogleDocs();
+    const copyResult = copyDraftForGoogleDocs();
+    const copyMode = typeof copyResult === "string" ? copyResult : await copyResult;
     const pasteShortcut = navigator.platform.toLowerCase().includes("mac") ? "Cmd+V" : "Ctrl+V";
     const formatLabel = copyMode === "rich" ? "with draft title, paragraphs, and traceability footnotes" : "as plain text";
-    els.flowExportStatus.textContent = `Draft copied ${formatLabel}. Open Google Docs and paste with ${pasteShortcut}.`;
+    const docsWindow = window.open("https://docs.google.com/document/create", "_blank", "noopener,noreferrer");
+    els.flowExportStatus.textContent = docsWindow
+      ? `Google Docs opened. Draft copied ${formatLabel}; paste with ${pasteShortcut}.`
+      : `Draft copied ${formatLabel}. Your browser blocked the Google Docs popup, so use the link below and paste with ${pasteShortcut}.`;
     els.flowGoogleDocsHandoff.innerHTML = `
       <strong>Ready for Google Docs</strong>
-      <p>The latest on-screen draft is copied. Open a new Google Doc, then paste with ${pasteShortcut} to insert the draft and source-traceability footnotes.</p>
+      <p>The latest on-screen draft is copied. Paste with ${pasteShortcut} to insert the draft and source-traceability footnotes.</p>
       <a class="secondary-action" href="https://docs.google.com/document/create" target="_blank" rel="noopener noreferrer">Open Google Docs</a>
     `;
     els.flowGoogleDocsHandoff.classList.remove("is-hidden");
