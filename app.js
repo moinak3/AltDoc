@@ -1466,45 +1466,56 @@ function draftFileName() {
   return `${slug || "altdoc-draft"}.docx`;
 }
 
-function downloadDraftDocx() {
+function triggerDraftDocxDownload() {
   editedDraft = getExportDraftDocument();
   draftHasUnsavedChanges = false;
   const blob = createDocxBlob();
   const url = URL.createObjectURL(blob);
+  const filename = draftFileName();
   const link = document.createElement("a");
   link.href = url;
-  link.download = draftFileName();
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return filename;
+}
+
+function downloadDraftDocx() {
+  triggerDraftDocxDownload();
   els.flowExportStatus.textContent = "Downloaded .docx with draft title, body, and source-traceability footnotes.";
+  hideGoogleDocsHandoff();
   els.flowSaveDraftButton.classList.remove("is-dirty");
 }
 
 async function exportDraftToGoogleDocs() {
   editedDraft = getExportDraftDocument();
   draftHasUnsavedChanges = false;
+  const filename = triggerDraftDocxDownload();
 
   try {
     const copyResult = copyDraftForGoogleDocs();
     const copyMode = typeof copyResult === "string" ? copyResult : await copyResult;
     const pasteShortcut = navigator.platform.toLowerCase().includes("mac") ? "Cmd+V" : "Ctrl+V";
     const formatLabel = copyMode === "rich" ? "with draft title, paragraphs, and traceability footnotes" : "as plain text";
-    const docsWindow = window.open("https://docs.google.com/document/create", "_blank", "noopener,noreferrer");
-    els.flowExportStatus.textContent = docsWindow
-      ? `Google Docs opened. Draft copied ${formatLabel}; paste with ${pasteShortcut}.`
-      : `Draft copied ${formatLabel}. Your browser blocked the Google Docs popup, so use the link below and paste with ${pasteShortcut}.`;
+    els.flowExportStatus.textContent = `Google Docs import file downloaded as ${filename}. Draft also copied ${formatLabel}.`;
     els.flowGoogleDocsHandoff.innerHTML = `
-      <strong>Ready for Google Docs</strong>
-      <p>The latest on-screen draft is copied. Paste with ${pasteShortcut} to insert the draft and source-traceability footnotes.</p>
-      <a class="secondary-action" href="https://docs.google.com/document/create" target="_blank" rel="noopener noreferrer">Open Google Docs</a>
+      <strong>Google Docs import ready</strong>
+      <p>The latest on-screen draft was downloaded as <strong>${escapeHtml(filename)}</strong>. Open Google Docs, upload that .docx, and the document will contain the draft text plus source-traceability footnotes.</p>
+      <p>For a blank Google Doc workflow, the same draft is copied ${formatLabel}; paste with ${pasteShortcut}.</p>
+      <a class="secondary-action" href="https://docs.google.com/document/u/0/" target="_blank" rel="noopener noreferrer">Open Google Docs</a>
     `;
     els.flowGoogleDocsHandoff.classList.remove("is-hidden");
   } catch (error) {
     console.warn(error);
-    hideGoogleDocsHandoff();
-    els.flowExportStatus.textContent = "Google Docs export could not access the clipboard. Use Download .docx; it includes the latest draft and traceability footnotes.";
+    els.flowExportStatus.textContent = `Google Docs import file downloaded as ${filename}. Clipboard copy was blocked, but the .docx includes the latest draft and traceability footnotes.`;
+    els.flowGoogleDocsHandoff.innerHTML = `
+      <strong>Google Docs import ready</strong>
+      <p>The latest on-screen draft was downloaded as <strong>${escapeHtml(filename)}</strong>. Open Google Docs, upload that .docx, and the document will contain the draft text plus source-traceability footnotes.</p>
+      <a class="secondary-action" href="https://docs.google.com/document/u/0/" target="_blank" rel="noopener noreferrer">Open Google Docs</a>
+    `;
+    els.flowGoogleDocsHandoff.classList.remove("is-hidden");
   }
   els.flowSaveDraftButton.classList.remove("is-dirty");
 }
