@@ -497,6 +497,8 @@ let uploadedContextFiles = {
 let editedDraft = null;
 let draftHasUnsavedChanges = false;
 let uploadedVoiceNotes = [];
+let followUpVoiceNotes = [];
+let followUpMergeMessage = "";
 let selectedVoiceNoteIds = new Set(scenarios.legal.notes.map((note) => note.id));
 let playingVoiceNoteId = "";
 let activeVoiceAudio = null;
@@ -548,6 +550,8 @@ const els = {
   flowThesisText: document.querySelector("#flowThesisText"),
   flowSupportList: document.querySelector("#flowSupportList"),
   flowGapList: document.querySelector("#flowGapList"),
+  flowFollowUpVoiceUpload: document.querySelector("#flowFollowUpVoiceUpload"),
+  flowFollowUpStatus: document.querySelector("#flowFollowUpStatus"),
   flowBackButton: document.querySelector("#flowBackButton"),
   flowNextButton: document.querySelector("#flowNextButton"),
   startScreen: document.querySelector("#startScreen"),
@@ -727,6 +731,14 @@ function resetDraftEdits() {
   draftHasUnsavedChanges = false;
 }
 
+function resetFollowUpVoiceNotes() {
+  followUpVoiceNotes = [];
+  followUpMergeMessage = "";
+  if (els.flowFollowUpVoiceUpload) {
+    els.flowFollowUpVoiceUpload.value = "";
+  }
+}
+
 function stopVoicePreview() {
   if (voicePreviewTimer) {
     window.clearTimeout(voicePreviewTimer);
@@ -851,6 +863,55 @@ function getFlowDraftDocument() {
       footnote: index + 1,
     })),
   };
+}
+
+function followUpTranscriptText(file, index) {
+  const cleanName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
+  const sourceLabel = cleanName || `follow-up voice note ${index + 1}`;
+  const domainDrafts = {
+    legal:
+      "The follow-up note adds the missing counterargument: a court could still treat the dispute as statutory interpretation after Loper Bright, but the better frame is whether the agency can explain how model-mediated design choices connect evidence to legal justification.",
+    medical:
+      "The follow-up note adds study-context detail: the memo should separate trial-extension evidence from real-world adherence data and avoid implying that every population has the same discontinuation pattern.",
+    strategy:
+      "The follow-up note adds a concrete customer example: the strongest case for a project-based workflow is that users do not want to rebuild context every session before the system can produce useful work.",
+  };
+  return `${domainDrafts[activeDomain] || domainDrafts.legal} Source note: ${sourceLabel}.`;
+}
+
+function mergeFollowUpVoiceNotes(files) {
+  const imported = [...files].map((file, index) => ({
+    id: `FN-${String(followUpVoiceNotes.length + index + 1).padStart(2, "0")}`,
+    name: file.name,
+    kind: file.type?.startsWith("audio/") ? "Audio file" : "Transcript file",
+    transcription: followUpTranscriptText(file, index),
+  }));
+  if (!imported.length) return;
+
+  followUpVoiceNotes = [...followUpVoiceNotes, ...imported];
+  if (els.flowFollowUpVoiceUpload) {
+    els.flowFollowUpVoiceUpload.value = "";
+  }
+  const baseDraft = getExportDraftDocument();
+  editedDraft = {
+    title: baseDraft.title,
+    paragraphs: [
+      ...baseDraft.paragraphs.map((paragraph) => ({
+        text: paragraph.text,
+        sources: paragraph.sources,
+      })),
+      ...imported.map((note) => ({
+        text: note.transcription,
+        sources: [note.id, "Stub transcription"],
+      })),
+    ],
+  };
+  draftHasUnsavedChanges = false;
+  flowStep = 4;
+  followUpMergeMessage = `${imported.length} new voice note${imported.length === 1 ? "" : "s"} transcribed and merged into the editable draft.`;
+  render();
+  els.flowExportStatus.textContent = followUpMergeMessage;
+  els.flowScreen.scrollIntoView({ block: "start" });
 }
 
 function collectDraftFromEditor() {
@@ -1058,6 +1119,9 @@ function renderFlowReadiness() {
       `,
     )
     .join("");
+  els.flowFollowUpStatus.textContent = followUpVoiceNotes.length
+    ? `${followUpVoiceNotes.length} follow-up voice note${followUpVoiceNotes.length === 1 ? "" : "s"} merged into the draft.`
+    : "No new voice notes imported yet.";
 }
 
 function escapeXml(value) {
@@ -1467,6 +1531,7 @@ function selectDomain(domain) {
   projectIntent = scenarios[domain].intent;
   isOtherOutputShape = false;
   resetDraftEdits();
+  resetFollowUpVoiceNotes();
   resetSelectedVoiceNotes();
   render();
 }
@@ -1528,6 +1593,9 @@ els.flowDraftBody.addEventListener("input", (event) => {
   if (event.target.closest(".draft-editable")) {
     markDraftDirty();
   }
+});
+els.flowFollowUpVoiceUpload.addEventListener("change", (event) => {
+  mergeFollowUpVoiceNotes(event.target.files);
 });
 els.flowDocxButton.addEventListener("click", downloadDraftDocx);
 els.flowGoogleDocsButton.addEventListener("click", exportDraftToGoogleDocs);
@@ -1661,6 +1729,7 @@ function showStartProject() {
   contextInput = "";
   resetContextImports();
   resetDraftEdits();
+  resetFollowUpVoiceNotes();
   uploadedVoiceNotes = [];
   exampleLinksInput = "";
   uploadedExampleFiles = [];
@@ -1735,6 +1804,7 @@ els.resetButton.addEventListener("click", () => {
   contextInput = "";
   resetContextImports();
   resetDraftEdits();
+  resetFollowUpVoiceNotes();
   uploadedVoiceNotes = [];
   exampleLinksInput = "";
   uploadedExampleFiles = [];
@@ -1754,6 +1824,7 @@ els.navStartOverButton.addEventListener("click", () => {
   contextInput = "";
   resetContextImports();
   resetDraftEdits();
+  resetFollowUpVoiceNotes();
   uploadedVoiceNotes = [];
   exampleLinksInput = "";
   uploadedExampleFiles = [];

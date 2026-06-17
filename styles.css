@@ -588,6 +588,32 @@ h1 {
   justify-self: start;
 }
 
+.follow-up-import {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid rgba(8, 125, 122, 0.28);
+  border-radius: 8px;
+  background: linear-gradient(180deg, white, var(--teal-soft));
+  padding: 14px;
+}
+
+.follow-up-import strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.follow-up-import p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.follow-up-import .primary-action {
+  justify-self: start;
+}
+
 .flow-actions {
   display: flex;
   justify-content: space-between;

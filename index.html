@@ -473,6 +473,21 @@
                   <div id="flowGapList" class="issue-list"></div>
                 </section>
               </div>
+              <section class="follow-up-import">
+                <div>
+                  <strong>Want to add more voice notes before finalizing?</strong>
+                  <p>Import new voice notes and AltDoc will transcribe them, merge the new thinking into the main document, and take you back to the editable draft.</p>
+                </div>
+                <input
+                  id="flowFollowUpVoiceUpload"
+                  class="visually-hidden-file"
+                  type="file"
+                  accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.txt,.md"
+                  multiple
+                />
+                <label class="primary-action file-action" id="flowFollowUpVoiceButton" for="flowFollowUpVoiceUpload">Import new voice notes</label>
+                <p class="subtle-copy" id="flowFollowUpStatus">No new voice notes imported yet.</p>
+              </section>
             </div>
           </section>
 
@@ -766,6 +781,6 @@
       </aside>
     </div>
 
-    <script src="app.js?v=inline-draft-editor-v1"></script>
+    <script src="app.js?v=follow-up-voice-loop-v1"></script>
   </body>
 </html>
