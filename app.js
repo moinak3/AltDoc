@@ -546,6 +546,7 @@ const els = {
   flowGoogleDocsButton: document.querySelector("#flowGoogleDocsButton"),
   flowDocxButton: document.querySelector("#flowDocxButton"),
   flowExportStatus: document.querySelector("#flowExportStatus"),
+  flowGoogleDocsHandoff: document.querySelector("#flowGoogleDocsHandoff"),
   flowScoreValue: document.querySelector("#flowScoreValue"),
   flowThesisText: document.querySelector("#flowThesisText"),
   flowSupportList: document.querySelector("#flowSupportList"),
@@ -729,6 +730,7 @@ function resetContextImports() {
 function resetDraftEdits() {
   editedDraft = null;
   draftHasUnsavedChanges = false;
+  hideGoogleDocsHandoff();
 }
 
 function resetFollowUpVoiceNotes() {
@@ -936,6 +938,7 @@ function markDraftDirty() {
   draftHasUnsavedChanges = true;
   els.flowExportStatus.textContent = "Unsaved edits. Save draft or export now to use the latest on-screen version.";
   els.flowSaveDraftButton.classList.add("is-dirty");
+  hideGoogleDocsHandoff();
 }
 
 function saveDraftEdits() {
@@ -943,6 +946,7 @@ function saveDraftEdits() {
   draftHasUnsavedChanges = false;
   els.flowSaveDraftButton.classList.remove("is-dirty");
   els.flowExportStatus.textContent = "Draft saved. Exports will use the latest saved inline edits.";
+  hideGoogleDocsHandoff();
 }
 
 function getExportDraftDocument() {
@@ -952,6 +956,12 @@ function getExportDraftDocument() {
     return editedDraft;
   }
   return getFlowDraftDocument();
+}
+
+function hideGoogleDocsHandoff() {
+  if (!els.flowGoogleDocsHandoff) return;
+  els.flowGoogleDocsHandoff.classList.add("is-hidden");
+  els.flowGoogleDocsHandoff.innerHTML = "";
 }
 
 function renderProject() {
@@ -1146,6 +1156,100 @@ function draftExportText() {
     .map((paragraph) => `[${paragraph.footnote}] ${paragraph.sources.join("; ")}`)
     .join("\n");
   return `${draft.title}\n\n${body}\n\nSource traceability\n${footnotes}`;
+}
+
+function draftExportHtml() {
+  const draft = getExportDraftDocument();
+  const paragraphs = draft.paragraphs
+    .map(
+      (paragraph) => `
+        <p>${escapeHtml(paragraph.text)} <sup>${paragraph.footnote}</sup></p>
+      `,
+    )
+    .join("");
+  const footnotes = draft.paragraphs
+    .map(
+      (paragraph) => `
+        <p><sup>${paragraph.footnote}</sup> ${paragraph.sources.map(escapeHtml).join("; ")}</p>
+      `,
+    )
+    .join("");
+  return `
+    <article>
+      <h1>${escapeHtml(draft.title)}</h1>
+      ${paragraphs}
+      <h2>Source traceability</h2>
+      ${footnotes}
+    </article>
+  `;
+}
+
+function legacyCopyText(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const didCopy = document.execCommand("copy");
+  textarea.remove();
+  return didCopy;
+}
+
+function legacyCopyDraftHtml(html, text) {
+  const container = document.createElement("div");
+  container.setAttribute("contenteditable", "true");
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(container);
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  let didCopy = false;
+  try {
+    didCopy = document.execCommand("copy");
+  } catch {
+    didCopy = false;
+  }
+  selection.removeAllRanges();
+  container.remove();
+
+  return didCopy || legacyCopyText(text);
+}
+
+async function copyDraftForGoogleDocs() {
+  const html = draftExportHtml();
+  const text = draftExportText();
+
+  if (legacyCopyDraftHtml(html, text)) {
+    return "rich";
+  }
+
+  if (navigator.clipboard?.write && window.ClipboardItem) {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([text], { type: "text/plain" }),
+      }),
+    ]);
+    return "rich";
+  }
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return "plain";
+  }
+
+  throw new Error("Clipboard export is unavailable");
 }
 
 function paragraphXml(text, style = "") {
@@ -1383,12 +1487,22 @@ function downloadDraftDocx() {
 async function exportDraftToGoogleDocs() {
   editedDraft = getExportDraftDocument();
   draftHasUnsavedChanges = false;
-  window.open("https://docs.google.com/document/create", "_blank", "noopener,noreferrer");
+
   try {
-    await navigator.clipboard.writeText(draftExportText());
-    els.flowExportStatus.textContent = "Opened a new Google Doc and copied the draft to clipboard. Paste it into the doc to complete this prototype export.";
-  } catch {
-    els.flowExportStatus.textContent = "Opened a new Google Doc. Clipboard access was blocked, so use Download .docx or copy the visible draft manually.";
+    const copyMode = await copyDraftForGoogleDocs();
+    const pasteShortcut = navigator.platform.toLowerCase().includes("mac") ? "Cmd+V" : "Ctrl+V";
+    const formatLabel = copyMode === "rich" ? "with draft title, paragraphs, and traceability footnotes" : "as plain text";
+    els.flowExportStatus.textContent = `Draft copied ${formatLabel}. Open Google Docs and paste with ${pasteShortcut}.`;
+    els.flowGoogleDocsHandoff.innerHTML = `
+      <strong>Ready for Google Docs</strong>
+      <p>The latest on-screen draft is copied. Open a new Google Doc, then paste with ${pasteShortcut} to insert the draft and source-traceability footnotes.</p>
+      <a class="secondary-action" href="https://docs.google.com/document/create" target="_blank" rel="noopener noreferrer">Open Google Docs</a>
+    `;
+    els.flowGoogleDocsHandoff.classList.remove("is-hidden");
+  } catch (error) {
+    console.warn(error);
+    hideGoogleDocsHandoff();
+    els.flowExportStatus.textContent = "Google Docs export could not access the clipboard. Use Download .docx; it includes the latest draft and traceability footnotes.";
   }
   els.flowSaveDraftButton.classList.remove("is-dirty");
 }
