@@ -431,6 +431,11 @@
                   <label class="secondary-action file-action" for="flowMarkdownContextUpload">Markdown files</label>
                 </div>
                 <p class="subtle-copy" id="flowContextImportStatus">No context files imported yet.</p>
+                <div class="priming-preview">
+                  <strong>Transcription priming terms</strong>
+                  <p>AltDoc will pass these distinct non-standard words to the transcription service before audio is transcribed.</p>
+                  <div id="flowPrimingTerms" class="term-list"></div>
+                </div>
               </div>
             </div>
           </section>
@@ -787,6 +792,6 @@
       </aside>
     </div>
 
-    <script src="app.js?v=target-structure-v1"></script>
+    <script src="app.js?v=domain-primed-transcription-v1"></script>
   </body>
 </html>

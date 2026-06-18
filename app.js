@@ -494,6 +494,7 @@ let uploadedContextFiles = {
   csv: [],
   markdown: [],
 };
+let contextPrimingWords = [];
 let editedDraft = null;
 let draftHasUnsavedChanges = false;
 let uploadedVoiceNotes = [];
@@ -541,6 +542,7 @@ const els = {
   flowCsvGlossaryUpload: document.querySelector("#flowCsvGlossaryUpload"),
   flowMarkdownContextUpload: document.querySelector("#flowMarkdownContextUpload"),
   flowContextImportStatus: document.querySelector("#flowContextImportStatus"),
+  flowPrimingTerms: document.querySelector("#flowPrimingTerms"),
   flowDraftBody: document.querySelector("#flowDraftBody"),
   flowDraftTitle: document.querySelector("#flowDraftTitle"),
   flowDraftFootnotes: document.querySelector("#flowDraftFootnotes"),
@@ -609,6 +611,93 @@ function parseExampleLinks(input) {
     .filter(Boolean)
     .filter((link, index, links) => links.findIndex((item) => item.toLowerCase() === link.toLowerCase()) === index)
     .slice(0, 8);
+}
+
+const commonWords = new Set(
+  "about after again agency all also and are argument around as at be because before between but by can case cases chapter claim could decision document does each enough every evidence example explain from generic good has have here how if in into is it legal make may memo more most need needs no not note notes of on one or other output over own parse problem project reasoning should so some strong structure that the their them then there these this those through to toward under use user what when where whether which while who why will with work writing you your".split(
+    " ",
+  ),
+);
+
+function normalizePrimingTerm(term) {
+  return String(term || "")
+    .replace(/^#+\s*/, "")
+    .replace(/^[\s"'([{]+|[\s"',.;:)\]}]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksNonStandardTerm(term) {
+  const normalized = normalizePrimingTerm(term);
+  if (normalized.length < 3 || normalized.length > 48) return false;
+  const lower = normalized.toLowerCase();
+  if (commonWords.has(lower)) return false;
+  if (/^[0-9]+$/.test(normalized)) return false;
+  return (
+    /[A-Z]{2,}/.test(normalized) ||
+    /[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/.test(normalized) ||
+    /[-/]/.test(normalized) ||
+    /\d/.test(normalized) ||
+    /(tion|ism|ity|ance|ence|genic|tide|model|review|statute|deference|interpretability)$/i.test(normalized)
+  );
+}
+
+function extractPrimingTerms(text) {
+  const source = String(text || "");
+  const candidates = [
+    ...source.matchAll(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,4}\b/g),
+    ...source.matchAll(/\b[A-Z]{2,}(?:-[A-Z0-9]+)?\b/g),
+    ...source.matchAll(/\b[A-Za-z]+(?:[-/][A-Za-z0-9]+)+\b/g),
+    ...source.matchAll(/\b[A-Za-z]*\d[A-Za-z0-9-]*\b/g),
+    ...source.matchAll(/\b[A-Za-z]{5,}(?:tion|ism|ity|ance|ence|genic|tide|model|review|statute|deference|interpretability)\b/gi),
+  ].map((match) => normalizePrimingTerm(match[0]));
+
+  source
+    .split(/[\n,;|]+/)
+    .map(normalizePrimingTerm)
+    .filter((term) => term.length <= 48)
+    .forEach((term) => candidates.push(term));
+
+  const seen = new Set();
+  return candidates
+    .filter(looksNonStandardTerm)
+    .filter((term) => {
+      const key = term.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function domainPrimingWords() {
+  const scenario = getScenario();
+  const importedText = [...uploadedContextFiles.csv, ...uploadedContextFiles.markdown]
+    .map((file) => [file.text, file.name, ...(file.terms || [])].filter(Boolean).join("\n"))
+    .join("\n");
+  const terms = [
+    ...extractPrimingTerms(scenario.label),
+    ...extractPrimingTerms(contextInput),
+    ...extractPrimingTerms(importedText),
+  ];
+  const seen = new Set();
+  return terms
+    .map(normalizePrimingTerm)
+    .filter(Boolean)
+    .filter((term) => {
+      const key = term.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 80);
+}
+
+function refreshContextPrimingWords() {
+  contextPrimingWords = domainPrimingWords();
+}
+
+function hasParsingContextFiles() {
+  return [...uploadedContextFiles.csv, ...uploadedContextFiles.markdown].some((file) => file.status === "Parsing");
 }
 
 function titleFromFileName(name) {
@@ -901,6 +990,7 @@ function resetContextImports() {
     csv: [],
     markdown: [],
   };
+  contextPrimingWords = [];
   if (els.flowCsvGlossaryUpload) {
     els.flowCsvGlossaryUpload.value = "";
   }
@@ -1003,6 +1093,31 @@ function readTextFile(file) {
   });
 }
 
+async function parseContextFiles(files, kind) {
+  return Promise.all(
+    [...files].map(async (file) => {
+      try {
+        const text = await readTextFile(file);
+        return {
+          name: file.name,
+          kind,
+          text,
+          terms: extractPrimingTerms(`${file.name}\n${text}`),
+          status: "Parsed",
+        };
+      } catch {
+        return {
+          name: file.name,
+          kind,
+          text: file.name,
+          terms: extractPrimingTerms(file.name),
+          status: "Filename parsed",
+        };
+      }
+    }),
+  );
+}
+
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1016,12 +1131,13 @@ function readFileAsBase64(file) {
 }
 
 function transcriptionPrompt() {
+  refreshContextPrimingWords();
   const scenario = getScenario();
-  const context = [projectIntent, contextInput, scenario.rule, scenario.terms.join(", ")]
+  const context = [projectIntent, contextInput, scenario.rule, contextPrimingWords.join(", ")]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
     .join("\n");
-  return `AltDoc project domain: ${scenario.label}. Target document: ${projectOutputShape}. Prefer these terms and context when transcribing:\n${context}`;
+  return `AltDoc project domain: ${scenario.label}. Target document: ${projectOutputShape}. Bias transcription toward these non-standard terms: ${contextPrimingWords.join(", ")}.\nContext:\n${context}`;
 }
 
 async function transcribeUploadFile(file, id) {
@@ -1079,6 +1195,58 @@ async function transcribeUploadFile(file, id) {
     transcriptionStatus: "ready",
     transcriptionSource: payload.source || "Audio transcription",
   };
+}
+
+async function ensureVoiceTranscriptionsReady() {
+  const queuedNotes = uploadedVoiceNotes.filter(
+    (note) => note.file && (note.transcriptionStatus === "queued" || note.transcriptionStatus === "pending"),
+  );
+  if (!queuedNotes.length) return;
+
+  refreshContextPrimingWords();
+  isTranscribingVoiceNotes = true;
+  const primingPreview = contextPrimingWords.slice(0, 8).join(", ") || "project context";
+  const queuedIds = new Set(queuedNotes.map((note) => note.id));
+  uploadedVoiceNotes = uploadedVoiceNotes.map((note) =>
+    queuedIds.has(note.id)
+      ? {
+          ...note,
+          time: "Transcribing",
+          text: `Transcribing with domain hints: ${primingPreview}`,
+          transcriptionStatus: "pending",
+        }
+      : note,
+  );
+  renderFlow();
+
+  const results = await Promise.all(
+    queuedNotes.map(async (note) => {
+      try {
+        const result = await transcribeUploadFile(note.file, note.id);
+        if (result.url && note.url && result.url !== note.url) {
+          URL.revokeObjectURL(result.url);
+        }
+        return {
+          ...result,
+          url: note.url || result.url,
+          file: note.file,
+        };
+      } catch (error) {
+        return {
+          ...note,
+          time: "Transcription failed",
+          text: error.message || `Could not transcribe ${note.title}.`,
+          transcriptionStatus: "error",
+          transcriptionSource: "Transcription error",
+        };
+      }
+    }),
+  );
+
+  const updatedById = new Map(results.map((note) => [note.id, note]));
+  uploadedVoiceNotes = uploadedVoiceNotes.map((note) => updatedById.get(note.id) || note);
+  isTranscribingVoiceNotes = false;
+  renderFlow();
 }
 
 function renderVoiceNoteRow(note) {
@@ -1297,6 +1465,7 @@ function renderFlow() {
   els.flowProgressBar.style.width = `${((flowStep + 1) / flowSteps.length) * 100}%`;
   els.flowBackButton.disabled = flowStep === 0;
   els.flowNextButton.textContent = flowStep === flowSteps.length - 1 ? "Back to homepage" : "Continue";
+  els.flowNextButton.disabled = isTranscribingVoiceNotes;
 
   if (document.activeElement !== els.flowIntent) {
     els.flowIntent.value = projectIntent;
@@ -1310,12 +1479,24 @@ function renderFlow() {
   if (document.activeElement !== els.flowContextInput) {
     els.flowContextInput.value = contextInput;
   }
+  refreshContextPrimingWords();
   const contextFileCount = uploadedContextFiles.csv.length + uploadedContextFiles.markdown.length;
+  const contextParsingCount = [...uploadedContextFiles.csv, ...uploadedContextFiles.markdown].filter(
+    (file) => file.status === "Parsing",
+  ).length;
+  if (flowStep === 3 && contextParsingCount) {
+    els.flowNextButton.disabled = true;
+  }
   const csvLabel = `${uploadedContextFiles.csv.length} CSV glossar${uploadedContextFiles.csv.length === 1 ? "y" : "ies"}`;
   const markdownLabel = `${uploadedContextFiles.markdown.length} Markdown file${uploadedContextFiles.markdown.length === 1 ? "" : "s"}`;
   els.flowContextImportStatus.textContent = contextFileCount
-    ? `${csvLabel} and ${markdownLabel} selected. AltDoc will parse these as domain context before transcription.`
+    ? contextParsingCount
+      ? `${contextParsingCount} context file${contextParsingCount === 1 ? "" : "s"} parsing before transcription can start.`
+      : `${csvLabel} and ${markdownLabel} parsed. AltDoc will use these terms before transcription starts.`
     : "No context files imported yet.";
+  els.flowPrimingTerms.innerHTML = contextPrimingWords.length
+    ? contextPrimingWords.map((term) => `<span class="term">${escapeHtml(term)}</span>`).join("")
+    : `<span class="empty-terms">No non-standard priming terms detected yet.</span>`;
   const sampleVoiceNotes = scenario.notes.map((note) => ({
     id: note.id,
     title: note.title,
@@ -1328,12 +1509,16 @@ function renderFlow() {
   const selectedCount = allVoiceNotes.filter((note) => selectedVoiceNoteIds.has(note.id)).length;
   const playbackNote = playingVoiceNoteId ? " Playback preview is running." : "";
   const pendingCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "pending").length;
+  const queuedCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "queued").length;
   const errorCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "error").length;
   const readyCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "ready").length;
   if (uploadedVoiceNotes.length) {
-    const transcriptionSummary = pendingCount
-      ? `${pendingCount} transcription${pendingCount === 1 ? "" : "s"} running.`
-      : `${readyCount} uploaded transcript${readyCount === 1 ? "" : "s"} ready${errorCount ? `, ${errorCount} failed` : ""}.`;
+    let transcriptionSummary = `${readyCount} uploaded transcript${readyCount === 1 ? "" : "s"} ready${errorCount ? `, ${errorCount} failed` : ""}.`;
+    if (pendingCount) {
+      transcriptionSummary = `${pendingCount} transcription${pendingCount === 1 ? "" : "s"} running with Step 4 domain hints.`;
+    } else if (queuedCount) {
+      transcriptionSummary = `${queuedCount} upload${queuedCount === 1 ? "" : "s"} waiting for Step 4 domain context before transcription.`;
+    }
     els.flowUploadStatus.textContent = `${selectedCount} of ${allVoiceNotes.length} voice note${allVoiceNotes.length === 1 ? "" : "s"} selected. ${transcriptionSummary}${playbackNote}`;
   } else {
     els.flowUploadStatus.textContent = `${selectedCount} of ${allVoiceNotes.length} sample voice note${allVoiceNotes.length === 1 ? "" : "s"} selected. Uncheck the samples if you only want to use your own uploaded notes.${playbackNote}`;
@@ -1878,16 +2063,32 @@ els.flowContextInput.addEventListener("input", (event) => {
   contextInput = event.target.value;
   renderFlow();
 });
-els.flowCsvGlossaryUpload.addEventListener("change", (event) => {
-  uploadedContextFiles.csv = [...event.target.files].map((file) => ({
+els.flowCsvGlossaryUpload.addEventListener("change", async (event) => {
+  const files = [...event.target.files];
+  uploadedContextFiles.csv = files.map((file) => ({
     name: file.name,
+    kind: "csv",
+    text: "",
+    terms: [],
+    status: "Parsing",
   }));
   renderFlow();
+  uploadedContextFiles.csv = await parseContextFiles(files, "csv");
+  refreshContextPrimingWords();
+  renderFlow();
 });
-els.flowMarkdownContextUpload.addEventListener("change", (event) => {
-  uploadedContextFiles.markdown = [...event.target.files].map((file) => ({
+els.flowMarkdownContextUpload.addEventListener("change", async (event) => {
+  const files = [...event.target.files];
+  uploadedContextFiles.markdown = files.map((file) => ({
     name: file.name,
+    kind: "markdown",
+    text: "",
+    terms: [],
+    status: "Parsing",
   }));
+  renderFlow();
+  uploadedContextFiles.markdown = await parseContextFiles(files, "markdown");
+  refreshContextPrimingWords();
   renderFlow();
 });
 els.flowSaveDraftButton.addEventListener("click", saveDraftEdits);
@@ -1940,7 +2141,6 @@ els.flowVoiceUpload.addEventListener("change", async (event) => {
   });
   const files = [...event.target.files];
   if (!files.length) return;
-  isTranscribingVoiceNotes = true;
   uploadedVoiceNotes = files.map((file, index) => {
     const id = `UP-${String(index + 1).padStart(2, "0")}`;
     const isAudio = isAudioUpload(file);
@@ -1948,36 +2148,15 @@ els.flowVoiceUpload.addEventListener("change", async (event) => {
     return {
       id,
       title: file.name,
-      time: isAudio ? "Audio file" : "Transcript file",
-      text: "Transcribing...",
-      url: isAudioUpload(file) ? URL.createObjectURL(file) : "",
+      time: isAudio ? "Queued audio" : "Queued transcript",
+      text: "Waiting for Step 4 domain context before transcription.",
+      url: isAudio ? URL.createObjectURL(file) : "",
       uploaded: true,
-      transcriptionStatus: "pending",
+      transcriptionStatus: "queued",
+      transcriptionSource: "Queued upload",
+      file,
     };
   });
-  renderFlow();
-
-  const transcribedNotes = await Promise.all(
-    files.map(async (file, index) => {
-      const id = `UP-${String(index + 1).padStart(2, "0")}`;
-      try {
-        return await transcribeUploadFile(file, id);
-      } catch (error) {
-        return {
-          id,
-          title: file.name,
-          time: "Transcription failed",
-          text: error.message || `Could not transcribe ${file.name}.`,
-          url: isAudioUpload(file) ? uploadedVoiceNotes[index]?.url || "" : "",
-          uploaded: true,
-          transcriptionStatus: "error",
-          transcriptionSource: "Transcription error",
-        };
-      }
-    }),
-  );
-
-  uploadedVoiceNotes = transcribedNotes;
   isTranscribingVoiceNotes = false;
   renderFlow();
 });
@@ -2118,8 +2297,16 @@ els.flowBackButton.addEventListener("click", () => {
   render();
 });
 
-els.flowNextButton.addEventListener("click", () => {
+els.flowNextButton.addEventListener("click", async () => {
   const totalSteps = document.querySelectorAll(".flow-step").length;
+  els.flowNextButton.disabled = true;
+  if (flowStep === 3) {
+    if (hasParsingContextFiles()) {
+      renderFlow();
+      return;
+    }
+    await ensureVoiceTranscriptionsReady();
+  }
   if (flowStep === totalSteps - 1) {
     activeView = "home";
     flowStep = 0;

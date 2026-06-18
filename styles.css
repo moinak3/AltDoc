@@ -467,6 +467,10 @@ h1 {
   color: var(--teal-deep);
 }
 
+.voice-transcript[data-status="queued"] {
+  color: #6b5acb;
+}
+
 .voice-transcript[data-status="error"] {
   color: #9f3f35;
 }
@@ -546,6 +550,26 @@ h1 {
   border-style: dashed;
   color: var(--muted);
   padding: 0 14px;
+}
+
+.priming-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 12px;
+}
+
+.priming-preview strong {
+  font-size: 13px;
+}
+
+.priming-preview p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .import-dropzone {
