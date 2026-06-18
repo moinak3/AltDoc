@@ -2570,6 +2570,58 @@ select:focus {
   padding: 7px 9px;
 }
 
+.draft-source-notes {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  background: #f7fafb;
+  padding: 12px;
+}
+
+.draft-source-heading,
+.draft-source-note div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.draft-source-heading strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.draft-source-heading span,
+.draft-source-note span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.draft-source-note {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 10px;
+}
+
+.draft-source-note.is-user-source {
+  border-color: rgba(8, 125, 122, 0.3);
+  background: var(--teal-soft);
+}
+
+.draft-source-note strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.draft-source-note p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .draft-actions {
   display: flex;
   flex-wrap: wrap;

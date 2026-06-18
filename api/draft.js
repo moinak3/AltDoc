@@ -41,6 +41,7 @@ function cleanNotes(notes) {
       role: cleanText(note.role).slice(0, 80),
       text: cleanText(note.text).slice(0, 2400),
       transcriptionSource: cleanText(note.transcriptionSource).slice(0, 120),
+      isUserProvided: Boolean(note.isUserProvided),
     }))
     .filter((note) => note.id && note.text);
 }
@@ -90,6 +91,11 @@ module.exports = async function draft(request, response) {
   const body = request.body || {};
   const notes = cleanNotes(body.notes);
   const targetStructure = cleanStructure(body.targetStructure);
+  const explicitRequiredSourceIds = cleanList(body.requiredSourceIds, 12);
+  const inferredRequiredSourceIds = notes.filter((note) => note.isUserProvided).map((note) => note.id);
+  const requiredSourceIds = [...new Set([...explicitRequiredSourceIds, ...inferredRequiredSourceIds])].filter((id) =>
+    notes.some((note) => note.id === id),
+  );
 
   if (!notes.length) {
     response.status(400).json({ error: "No transcribed voice notes were provided for draft generation." });
@@ -112,6 +118,7 @@ module.exports = async function draft(request, response) {
     domainContext: clipText(body.domainContext, 2400),
     primingWords: cleanList(body.primingWords, 80),
     targetStructure,
+    requiredSourceIds,
     notes,
   };
 
@@ -136,7 +143,7 @@ module.exports = async function draft(request, response) {
           role: "user",
           content: JSON.stringify({
             instruction:
-              "Create a lightweight traceable draft. Return JSON with title and paragraphs. paragraphs must be an array of { text, sources }. Keep the draft 3-6 substantial paragraphs. Make the writing document-like, not a summary of notes.",
+              "Create a lightweight traceable draft. Return JSON with title and paragraphs. paragraphs must be an array of { text, sources }. Keep the draft 3-6 substantial paragraphs. Make the writing document-like, not a summary of notes. Required source IDs are user-uploaded or live-recorded voice notes; every required source ID must appear in at least one paragraph sources array and its transcript must materially influence that paragraph.",
             allowedSources: [...allowedSources],
             draftInput,
           }),
@@ -156,6 +163,16 @@ module.exports = async function draft(request, response) {
   const content = payload.choices?.[0]?.message?.content || "";
   const parsed = parseModelJson(content);
   const paragraphs = normalizeParagraphs(parsed.paragraphs, allowedSources);
+  const usedSources = new Set(paragraphs.flatMap((paragraph) => paragraph.sources));
+  requiredSourceIds.forEach((id) => {
+    if (usedSources.has(id)) return;
+    const note = notes.find((item) => item.id === id);
+    if (!note) return;
+    paragraphs.push({
+      text: `${note.title} adds this source material to the draft: ${note.text.slice(0, 700)}${note.text.length > 700 ? "..." : ""}`,
+      sources: [id],
+    });
+  });
 
   if (!paragraphs.length) {
     response.status(502).json({ error: "The draft model did not return usable paragraphs." });

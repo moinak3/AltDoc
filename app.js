@@ -559,6 +559,7 @@ const els = {
   flowDraftTitle: document.querySelector("#flowDraftTitle"),
   flowDraftFootnotes: document.querySelector("#flowDraftFootnotes"),
   flowDraftPayoff: document.querySelector("#flowDraftPayoff"),
+  flowDraftSources: document.querySelector("#flowDraftSources"),
   flowDocxButton: document.querySelector("#flowDocxButton"),
   flowExportStatus: document.querySelector("#flowExportStatus"),
   flowScoreValue: document.querySelector("#flowScoreValue"),
@@ -995,6 +996,12 @@ function resetSelectedVoiceNotes() {
   playingVoiceNoteId = "";
 }
 
+function deselectSampleVoiceNotes() {
+  getScenario().notes.forEach((note) => {
+    selectedVoiceNoteIds.delete(note.id);
+  });
+}
+
 function resetSuggestedExamples() {
   selectedSuggestedExampleIds = new Set(["research-evidence-memo", "thesis-argument-chapter"]);
   activeSuggestedExampleId = "research-evidence-memo";
@@ -1245,6 +1252,7 @@ function replaceUploadedVoiceNotes(files, idPrefix = "UP") {
   uploadedVoiceNotes.forEach((note) => {
     if (note.url) URL.revokeObjectURL(note.url);
   });
+  deselectSampleVoiceNotes();
   uploadedVoiceNotes = [...files].map((file, index) => queuedVoiceNoteFromFile(file, index, idPrefix));
   isTranscribingVoiceNotes = false;
   resetDraftEdits();
@@ -1252,12 +1260,19 @@ function replaceUploadedVoiceNotes(files, idPrefix = "UP") {
 }
 
 function appendUploadedVoiceNote(file) {
+  if (!uploadedVoiceNotes.length) {
+    deselectSampleVoiceNotes();
+  }
   const note = queuedVoiceNoteFromFile(file, uploadedVoiceNotes.length, "REC");
   uploadedVoiceNotes = [...uploadedVoiceNotes, note];
   isTranscribingVoiceNotes = false;
   resetDraftEdits();
   renderFlow();
   return note;
+}
+
+function isReadyVoiceNote(note) {
+  return note && note.transcriptionStatus !== "error" && note.transcriptionStatus !== "queued" && note.transcriptionStatus !== "pending";
 }
 
 function readTextFile(file) {
@@ -1422,27 +1437,30 @@ async function ensureVoiceTranscriptionsReady() {
   const updatedById = new Map(results.map((note) => [note.id, note]));
   uploadedVoiceNotes = uploadedVoiceNotes.map((note) => updatedById.get(note.id) || note);
   isTranscribingVoiceNotes = false;
+  resetDraftEdits();
   renderFlow();
 }
 
 function selectedNotesForDraft() {
+  const uploadedNotes = uploadedVoiceNotes
+    .filter(isReadyVoiceNote)
+    .map((note) => ({
+      id: note.id,
+      title: note.title,
+      role: note.uploaded ? "User uploaded or recorded voice note" : note.role,
+      text: note.text,
+      transcriptionSource: note.transcriptionSource || "Uploaded transcript",
+      isUserProvided: true,
+    }));
   const scenarioNotes = getScenario().notes.map((note) => ({
     id: note.id,
     title: note.title,
     role: note.role,
     text: note.text,
     transcriptionSource: "Sample transcript",
+    isUserProvided: false,
   }));
-  const uploadedNotes = uploadedVoiceNotes
-    .filter((note) => note.transcriptionStatus !== "error" && note.transcriptionStatus !== "queued")
-    .map((note) => ({
-      id: note.id,
-      title: note.title,
-      role: note.uploaded ? "Uploaded voice note" : note.role,
-      text: note.text,
-      transcriptionSource: note.transcriptionSource || "Uploaded transcript",
-    }));
-  return [...scenarioNotes, ...uploadedNotes].filter((note) => selectedVoiceNoteIds.has(note.id) && note.text);
+  return [...uploadedNotes, ...scenarioNotes].filter((note) => selectedVoiceNoteIds.has(note.id) && note.text);
 }
 
 async function generateTraceableDraft() {
@@ -1452,6 +1470,7 @@ async function generateTraceableDraft() {
   }
 
   refreshContextPrimingWords();
+  const requiredSourceIds = notes.filter((note) => note.isUserProvided).map((note) => note.id);
   const response = await fetch("/api/draft", {
     method: "POST",
     headers: {
@@ -1464,6 +1483,7 @@ async function generateTraceableDraft() {
       domainContext: contextInput,
       primingWords: contextPrimingWords,
       targetStructure: targetStructureItems(),
+      requiredSourceIds,
       notes,
     }),
   });
@@ -1498,17 +1518,11 @@ async function ensureGeneratedDraftReady() {
   isGeneratingDraft = true;
   draftGenerationMessage = "Generating a traceable draft from the transcribed notes and target document schema...";
   renderFlow();
+  const notes = selectedNotesForDraft();
   try {
     await generateTraceableDraft();
   } catch (error) {
-    const scenario = getScenario();
-    editedDraft = {
-      title: getDraftTitle(),
-      paragraphs: scenario.draft.map((paragraph) => ({
-        text: paragraph.text,
-        sources: paragraph.sources,
-      })),
-    };
+    editedDraft = localTraceableDraftFromNotes(notes, error);
     draftGenerationMessage = friendlyDraftGenerationMessage(error);
   } finally {
     isGeneratingDraft = false;
@@ -1575,6 +1589,84 @@ function getDraftTitle() {
     return fallbackTitles.legal;
   }
   return fallbackTitles[activeDomain] || `${projectOutputShape || "Draft"} from Voice Notes`;
+}
+
+function clipDraftSourceText(text, limit = 520) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if (clean.length <= limit) return clean;
+  return `${clean.slice(0, limit).trim()}...`;
+}
+
+function localTraceableDraftFromNotes(notes, error) {
+  const selected = notes.filter((note) => note.text).slice(0, 6);
+  if (!selected.length) {
+    return {
+      title: getDraftTitle(),
+      paragraphs: [
+        {
+          text:
+            "AltDoc could not generate a draft because no ready transcript text was available. Import or record a voice note, complete domain-context priming, and continue after transcription finishes.",
+          sources: ["Project context"],
+        },
+      ],
+    };
+  }
+
+  const userNotes = selected.filter((note) => note.isUserProvided);
+  const primaryNotes = userNotes.length ? userNotes : selected;
+  const schema = targetStructureItems()
+    .slice(0, 3)
+    .map((item) => item.heading)
+    .filter(Boolean)
+    .join(", ");
+  const setup = [
+    projectIntent ? `This ${projectOutputShape || "document"} is being drafted toward this intent: ${projectIntent}` : "",
+    schema ? `The target structure emphasizes ${schema}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const paragraphs = [];
+  if (setup) {
+    paragraphs.push({
+      text: setup,
+      sources: ["Project context", "Target document schema"],
+    });
+  }
+
+  primaryNotes.forEach((note) => {
+    paragraphs.push({
+      text: `${note.title} contributes the following source material to the draft: ${clipDraftSourceText(note.text)} This point should be developed in the document only to the extent the transcript supports it.`,
+      sources: [note.id],
+    });
+  });
+
+  if (selected.length > primaryNotes.length) {
+    const supportingIds = selected
+      .filter((note) => !primaryNotes.includes(note))
+      .map((note) => note.id)
+      .slice(0, 4);
+    if (supportingIds.length) {
+      paragraphs.push({
+        text:
+          "The selected sample notes can provide supporting structure or comparison, but the user-provided transcript remains the primary source for any new claims in this draft.",
+        sources: supportingIds,
+      });
+    }
+  }
+
+  if (error) {
+    paragraphs.push({
+      text:
+        "This draft was generated locally from the selected transcripts because model drafting was unavailable. It preserves traceability instead of substituting the canned sample draft.",
+      sources: ["AI inference"],
+    });
+  }
+
+  return {
+    title: getDraftTitle(),
+    paragraphs: paragraphs.slice(0, 6),
+  };
 }
 
 function getFlowDraftDocument() {
@@ -1685,9 +1777,9 @@ function markDraftDirty() {
 function friendlyDraftGenerationMessage(error) {
   const message = String(error?.message || "");
   if (/api key|OPENAI_API_KEY|OpenAI|model|quota|rate limit/i.test(message)) {
-    return "Draft generation is temporarily unavailable. Showing a sample traceable draft.";
+    return "Model draft generation is temporarily unavailable. Showing a local draft built from the selected transcripts.";
   }
-  return `${message || "Draft generation is temporarily unavailable."} Showing a sample traceable draft.`;
+  return `${message || "Draft generation is temporarily unavailable."} Showing a local draft built from the selected transcripts.`;
 }
 
 function getExportDraftDocument() {
@@ -1880,6 +1972,32 @@ function renderFlowDraft() {
       <span>Generated from ${selectedNoteCount} note${selectedNoteCount === 1 ? "" : "s"}</span>
       <span>${schemaCount}-part target structure</span>
       <span>${draft.paragraphs.length} source-linked paragraph${draft.paragraphs.length === 1 ? "" : "s"}</span>
+    `;
+  }
+  if (els.flowDraftSources) {
+    const notes = selectedNotesForDraft();
+    els.flowDraftSources.innerHTML = `
+      <div class="draft-source-heading">
+        <strong>Transcripts used</strong>
+        <span>${notes.length} selected source${notes.length === 1 ? "" : "s"}</span>
+      </div>
+      ${
+        notes.length
+          ? notes
+              .map(
+                (note) => `
+                  <article class="draft-source-note ${note.isUserProvided ? "is-user-source" : ""}">
+                    <div>
+                      <strong>${escapeHtml(note.id)} · ${escapeHtml(note.title)}</strong>
+                      <span>${escapeHtml(note.transcriptionSource || "Transcript")}</span>
+                    </div>
+                    <p>${escapeHtml(clipDraftSourceText(note.text, 360))}</p>
+                  </article>
+                `,
+              )
+              .join("")
+          : `<p class="subtle-copy">No ready transcripts are selected yet.</p>`
+      }
     `;
   }
   if (!draftHasUnsavedChanges && !els.flowExportStatus.textContent.includes("Exported")) {
