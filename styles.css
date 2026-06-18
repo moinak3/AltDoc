@@ -456,6 +456,21 @@ h1 {
   font-size: 13px;
 }
 
+.voice-transcript {
+  grid-column: 4 / 6;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.voice-transcript[data-status="pending"] {
+  color: var(--teal-deep);
+}
+
+.voice-transcript[data-status="error"] {
+  color: #9f3f35;
+}
+
 .flow-file-row.is-unselected {
   background: #f4f6f7;
   opacity: 0.72;

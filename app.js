@@ -497,6 +497,7 @@ let uploadedContextFiles = {
 let editedDraft = null;
 let draftHasUnsavedChanges = false;
 let uploadedVoiceNotes = [];
+let isTranscribingVoiceNotes = false;
 let followUpVoiceNotes = [];
 let followUpMergeMessage = "";
 let selectedVoiceNoteIds = new Set(scenarios.legal.notes.map((note) => note.id));
@@ -802,12 +803,114 @@ function playVoicePreview(note) {
   }
 }
 
+function isAudioUpload(file) {
+  return file.type?.startsWith("audio/") || /\.(m4a|mp3|wav|aac|ogg|webm|mp4)$/i.test(file.name);
+}
+
+function isTranscriptUpload(file) {
+  return file.type?.startsWith("text/") || /\.(txt|md|markdown)$/i.test(file.name);
+}
+
+function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+    reader.readAsText(file);
+  });
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.includes(",") ? result.split(",").pop() : result);
+    };
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function transcriptionPrompt() {
+  const scenario = getScenario();
+  const context = [projectIntent, contextInput, scenario.rule, scenario.terms.join(", ")]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join("\n");
+  return `AltDoc project domain: ${scenario.label}. Target document: ${projectOutputShape}. Prefer these terms and context when transcribing:\n${context}`;
+}
+
+async function transcribeUploadFile(file, id) {
+  const isAudio = isAudioUpload(file);
+  const baseNote = {
+    id,
+    title: file.name,
+    time: isAudio ? "Audio file" : "Transcript file",
+    url: isAudio ? URL.createObjectURL(file) : "",
+    uploaded: true,
+  };
+
+  if (isTranscriptUpload(file) && !isAudio) {
+    const text = (await readTextFile(file)).trim();
+    return {
+      ...baseNote,
+      time: "Transcript ready",
+      text: text || `No transcript text found in ${file.name}.`,
+      transcriptionStatus: text ? "ready" : "error",
+      transcriptionSource: "Uploaded transcript file",
+    };
+  }
+
+  if (!isAudio) {
+    return {
+      ...baseNote,
+      text: `AltDoc could not transcribe ${file.name}. Upload an audio file, .txt, or .md transcript.`,
+      transcriptionStatus: "error",
+      transcriptionSource: "Unsupported file type",
+    };
+  }
+
+  const dataBase64 = await readFileAsBase64(file);
+  const result = await fetch("/api/transcribe", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      dataBase64,
+      prompt: transcriptionPrompt(),
+    }),
+  });
+  const payload = await result.json().catch(() => ({}));
+  if (!result.ok) {
+    throw new Error(payload.error || `Could not transcribe ${file.name}.`);
+  }
+
+  return {
+    ...baseNote,
+    time: "Transcript ready",
+    text: String(payload.text || "").trim() || `No speech detected in ${file.name}.`,
+    transcriptionStatus: "ready",
+    transcriptionSource: payload.source || "Audio transcription",
+  };
+}
+
 function renderVoiceNoteRow(note) {
   const isSelected = selectedVoiceNoteIds.has(note.id);
   const isPlaying = playingVoiceNoteId === note.id;
   const rowClasses = ["flow-file-row", note.uploaded ? "uploaded" : "", isSelected ? "" : "is-unselected"]
     .filter(Boolean)
     .join(" ");
+  const transcriptPreview = note.uploaded
+    ? `
+      <small class="voice-transcript" data-status="${note.transcriptionStatus || "ready"}">
+        ${escapeHtml(note.text || "Transcribing...")}
+      </small>
+    `
+    : "";
   return `
     <div class="${rowClasses}" data-voice-id="${note.id}">
       <label class="voice-select" aria-label="Use ${escapeHtml(note.title)}">
@@ -821,6 +924,7 @@ function renderVoiceNoteRow(note) {
       <span>${note.id}</span>
       <strong>${escapeHtml(note.title)}</strong>
       <em>${note.time}</em>
+      ${transcriptPreview}
     </div>
   `;
 }
@@ -864,32 +968,45 @@ function getFlowDraftDocument() {
   };
 }
 
-function followUpTranscriptText(file, index) {
-  const cleanName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
-  const sourceLabel = cleanName || `follow-up voice note ${index + 1}`;
-  const domainDrafts = {
-    legal:
-      "The follow-up note adds the missing counterargument: a court could still treat the dispute as statutory interpretation after Loper Bright, but the better frame is whether the agency can explain how model-mediated design choices connect evidence to legal justification.",
-    medical:
-      "The follow-up note adds study-context detail: the memo should separate trial-extension evidence from real-world adherence data and avoid implying that every population has the same discontinuation pattern.",
-    strategy:
-      "The follow-up note adds a concrete customer example: the strongest case for a project-based workflow is that users do not want to rebuild context every session before the system can produce useful work.",
-  };
-  return `${domainDrafts[activeDomain] || domainDrafts.legal} Source note: ${sourceLabel}.`;
-}
+async function mergeFollowUpVoiceNotes(files) {
+  const fileList = [...files];
+  if (!fileList.length) return;
 
-function mergeFollowUpVoiceNotes(files) {
-  const imported = [...files].map((file, index) => ({
-    id: `FN-${String(followUpVoiceNotes.length + index + 1).padStart(2, "0")}`,
-    name: file.name,
-    kind: file.type?.startsWith("audio/") ? "Audio file" : "Transcript file",
-    transcription: followUpTranscriptText(file, index),
-  }));
-  if (!imported.length) return;
+  els.flowFollowUpStatus.textContent = `${fileList.length} follow-up voice note${fileList.length === 1 ? "" : "s"} transcribing...`;
+  const imported = await Promise.all(
+    fileList.map(async (file, index) => {
+      const id = `FN-${String(followUpVoiceNotes.length + index + 1).padStart(2, "0")}`;
+      try {
+        const note = await transcribeUploadFile(file, id);
+        return {
+          id,
+          name: file.name,
+          kind: isAudioUpload(file) ? "Audio file" : "Transcript file",
+          transcription: note.text,
+          transcriptionStatus: note.transcriptionStatus,
+        };
+      } catch (error) {
+        return {
+          id,
+          name: file.name,
+          kind: isAudioUpload(file) ? "Audio file" : "Transcript file",
+          transcription: error.message || `Could not transcribe ${file.name}.`,
+          transcriptionStatus: "error",
+        };
+      }
+    }),
+  );
 
   followUpVoiceNotes = [...followUpVoiceNotes, ...imported];
   if (els.flowFollowUpVoiceUpload) {
     els.flowFollowUpVoiceUpload.value = "";
+  }
+  const readyImports = imported.filter((note) => note.transcriptionStatus !== "error" && note.transcription.trim());
+  if (!readyImports.length) {
+    followUpMergeMessage = "No follow-up notes were merged because transcription failed.";
+    render();
+    els.flowFollowUpStatus.textContent = followUpMergeMessage;
+    return;
   }
   const baseDraft = getExportDraftDocument();
   editedDraft = {
@@ -899,15 +1016,15 @@ function mergeFollowUpVoiceNotes(files) {
         text: paragraph.text,
         sources: paragraph.sources,
       })),
-      ...imported.map((note) => ({
+      ...readyImports.map((note) => ({
         text: note.transcription,
-        sources: [note.id, "Stub transcription"],
+        sources: [note.id, "Transcription"],
       })),
     ],
   };
   draftHasUnsavedChanges = false;
   flowStep = 4;
-  followUpMergeMessage = `${imported.length} new voice note${imported.length === 1 ? "" : "s"} transcribed and merged into the editable draft.`;
+  followUpMergeMessage = `${readyImports.length} new voice note${readyImports.length === 1 ? "" : "s"} transcribed and merged into the editable draft.`;
   render();
   els.flowExportStatus.textContent = followUpMergeMessage;
   els.flowScreen.scrollIntoView({ block: "start" });
@@ -1027,9 +1144,17 @@ function renderFlow() {
   els.flowVoiceNotes.innerHTML = allVoiceNotes.map(renderVoiceNoteRow).join("");
   const selectedCount = allVoiceNotes.filter((note) => selectedVoiceNoteIds.has(note.id)).length;
   const playbackNote = playingVoiceNoteId ? " Playback preview is running." : "";
-  els.flowUploadStatus.textContent = uploadedVoiceNotes.length
-    ? `${selectedCount} of ${allVoiceNotes.length} voice note${allVoiceNotes.length === 1 ? "" : "s"} selected. Uploaded files are listed locally; transcription is stubbed.${playbackNote}`
-    : `${selectedCount} of ${allVoiceNotes.length} sample voice note${allVoiceNotes.length === 1 ? "" : "s"} selected. Uncheck the samples if you only want to use your own uploaded notes.${playbackNote}`;
+  const pendingCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "pending").length;
+  const errorCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "error").length;
+  const readyCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "ready").length;
+  if (uploadedVoiceNotes.length) {
+    const transcriptionSummary = pendingCount
+      ? `${pendingCount} transcription${pendingCount === 1 ? "" : "s"} running.`
+      : `${readyCount} uploaded transcript${readyCount === 1 ? "" : "s"} ready${errorCount ? `, ${errorCount} failed` : ""}.`;
+    els.flowUploadStatus.textContent = `${selectedCount} of ${allVoiceNotes.length} voice note${allVoiceNotes.length === 1 ? "" : "s"} selected. ${transcriptionSummary}${playbackNote}`;
+  } else {
+    els.flowUploadStatus.textContent = `${selectedCount} of ${allVoiceNotes.length} sample voice note${allVoiceNotes.length === 1 ? "" : "s"} selected. Uncheck the samples if you only want to use your own uploaded notes.${playbackNote}`;
+  }
   if (document.activeElement !== els.flowExampleLinks) {
     els.flowExampleLinks.value = exampleLinksInput;
   }
@@ -1118,8 +1243,9 @@ function renderFlowReadiness() {
       `,
     )
     .join("");
-  els.flowFollowUpStatus.textContent = followUpVoiceNotes.length
-    ? `${followUpVoiceNotes.length} follow-up voice note${followUpVoiceNotes.length === 1 ? "" : "s"} merged into the draft.`
+  const mergedFollowUpCount = followUpVoiceNotes.filter((note) => note.transcriptionStatus !== "error").length;
+  els.flowFollowUpStatus.textContent = mergedFollowUpCount
+    ? `${mergedFollowUpCount} follow-up voice note${mergedFollowUpCount === 1 ? "" : "s"} merged into the draft.`
     : "No new voice notes imported yet.";
 }
 
@@ -1622,24 +1748,52 @@ els.flowVoiceNotes.addEventListener("click", (event) => {
     playVoicePreview(note);
   }
 });
-els.flowVoiceUpload.addEventListener("change", (event) => {
+els.flowVoiceUpload.addEventListener("change", async (event) => {
   stopVoicePreview();
   uploadedVoiceNotes.forEach((file) => {
     if (file.url) URL.revokeObjectURL(file.url);
   });
-  uploadedVoiceNotes = [...event.target.files].map((file, index) => {
+  const files = [...event.target.files];
+  if (!files.length) return;
+  isTranscribingVoiceNotes = true;
+  uploadedVoiceNotes = files.map((file, index) => {
     const id = `UP-${String(index + 1).padStart(2, "0")}`;
-    const isAudio = file.type?.startsWith("audio/");
+    const isAudio = isAudioUpload(file);
     selectedVoiceNoteIds.add(id);
     return {
       id,
       title: file.name,
       time: isAudio ? "Audio file" : "Transcript file",
-      text: `Uploaded file ${file.name} will be transcribed in the real product.`,
-      url: isAudio ? URL.createObjectURL(file) : "",
+      text: "Transcribing...",
+      url: isAudioUpload(file) ? URL.createObjectURL(file) : "",
       uploaded: true,
+      transcriptionStatus: "pending",
     };
   });
+  renderFlow();
+
+  const transcribedNotes = await Promise.all(
+    files.map(async (file, index) => {
+      const id = `UP-${String(index + 1).padStart(2, "0")}`;
+      try {
+        return await transcribeUploadFile(file, id);
+      } catch (error) {
+        return {
+          id,
+          title: file.name,
+          time: "Transcription failed",
+          text: error.message || `Could not transcribe ${file.name}.`,
+          url: isAudioUpload(file) ? uploadedVoiceNotes[index]?.url || "" : "",
+          uploaded: true,
+          transcriptionStatus: "error",
+          transcriptionSource: "Transcription error",
+        };
+      }
+    }),
+  );
+
+  uploadedVoiceNotes = transcribedNotes;
+  isTranscribingVoiceNotes = false;
   renderFlow();
 });
 els.flowExampleLinks.addEventListener("input", (event) => {
