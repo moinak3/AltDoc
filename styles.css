@@ -857,9 +857,25 @@ h1 {
   margin-top: 28px;
 }
 
-.hero-button {
+.view-home .hero-button {
+  border-color: rgba(17, 24, 32, 0.92);
+  background: var(--nav);
+  color: white;
   min-height: 44px;
   padding: 0 18px;
+  box-shadow: 0 10px 24px rgba(17, 24, 32, 0.22);
+}
+
+.view-home .hero-button:hover {
+  border-color: var(--nav);
+  background: #253241;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.view-home .hero-button:focus-visible {
+  outline: 3px solid rgba(8, 125, 122, 0.28);
+  outline-offset: 2px;
 }
 
 .hero-product-shot {
