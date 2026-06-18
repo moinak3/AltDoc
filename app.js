@@ -507,6 +507,14 @@ let selectedVoiceNoteIds = new Set(scenarios.legal.notes.map((note) => note.id))
 let playingVoiceNoteId = "";
 let activeVoiceAudio = null;
 let voicePreviewTimer = null;
+let mediaRecorder = null;
+let recordingStream = null;
+let recordingChunks = [];
+let recordingStartedAt = 0;
+let recordingTimer = null;
+let recorderStatus = "Ready to record in browser.";
+let isRecordingVoiceNote = false;
+let discardCurrentRecording = false;
 let exampleLinksInput = "";
 let uploadedExampleFiles = [];
 let selectedSuggestedExampleIds = new Set(["research-evidence-memo", "thesis-argument-chapter"]);
@@ -528,6 +536,9 @@ const els = {
   flowVoiceNotes: document.querySelector("#flowVoiceNotes"),
   flowVoiceUpload: document.querySelector("#flowVoiceUpload"),
   flowUploadVoiceButton: document.querySelector("#flowUploadVoiceButton"),
+  flowRecordVoiceButton: document.querySelector("#flowRecordVoiceButton"),
+  flowRecorderStatus: document.querySelector("#flowRecorderStatus"),
+  flowRecorderStatusText: document.querySelector("#flowRecorderStatusText"),
   flowUploadStatus: document.querySelector("#flowUploadStatus"),
   flowAddVoiceButton: document.querySelector("#flowAddVoiceButton"),
   flowExamples: document.querySelector("#flowExamples"),
@@ -1035,6 +1046,128 @@ function stopVoicePreview() {
   playingVoiceNoteId = "";
 }
 
+function formatElapsed(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function setRecorderStatus(message) {
+  recorderStatus = message;
+  if (els.flowRecorderStatusText) {
+    els.flowRecorderStatusText.textContent = recorderStatus;
+  }
+}
+
+function stopRecordingTimer() {
+  if (recordingTimer) {
+    window.clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+}
+
+function cleanupRecordingStream() {
+  if (recordingStream) {
+    recordingStream.getTracks().forEach((track) => track.stop());
+    recordingStream = null;
+  }
+}
+
+function recordingMimeType() {
+  if (!window.MediaRecorder) return "";
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+async function startLiveRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    setRecorderStatus("Live recording is not supported in this browser. Upload an audio file instead.");
+    return;
+  }
+
+  stopVoicePreview();
+  recordingChunks = [];
+  try {
+    recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = recordingMimeType();
+    mediaRecorder = new MediaRecorder(recordingStream, mimeType ? { mimeType } : undefined);
+    discardCurrentRecording = false;
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) {
+        recordingChunks.push(event.data);
+      }
+    });
+    mediaRecorder.addEventListener("stop", handleRecordingStopped);
+    recordingStartedAt = Date.now();
+    isRecordingVoiceNote = true;
+    setRecorderStatus("Recording live note 00:00");
+    recordingTimer = window.setInterval(() => {
+      setRecorderStatus(`Recording live note ${formatElapsed(Date.now() - recordingStartedAt)}`);
+    }, 500);
+    mediaRecorder.start();
+    renderFlow();
+  } catch {
+    cleanupRecordingStream();
+    isRecordingVoiceNote = false;
+    setRecorderStatus("Microphone access was not available. Upload an audio file instead.");
+    renderFlow();
+  }
+}
+
+function stopLiveRecording() {
+  if (!mediaRecorder || mediaRecorder.state === "inactive") return;
+  discardCurrentRecording = false;
+  setRecorderStatus("Saving live recording...");
+  mediaRecorder.stop();
+}
+
+function cancelLiveRecording() {
+  stopRecordingTimer();
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    discardCurrentRecording = true;
+    mediaRecorder.stop();
+    return;
+  }
+  mediaRecorder = null;
+  isRecordingVoiceNote = false;
+  recordingChunks = [];
+  cleanupRecordingStream();
+  setRecorderStatus("Ready to record in browser.");
+}
+
+function handleRecordingStopped() {
+  stopRecordingTimer();
+  cleanupRecordingStream();
+  const mimeType = mediaRecorder?.mimeType || "audio/webm";
+  mediaRecorder = null;
+  isRecordingVoiceNote = false;
+
+  if (discardCurrentRecording) {
+    discardCurrentRecording = false;
+    recordingChunks = [];
+    setRecorderStatus("Ready to record in browser.");
+    renderFlow();
+    return;
+  }
+
+  if (!recordingChunks.length) {
+    setRecorderStatus("No audio was captured. Try recording again.");
+    renderFlow();
+    return;
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const extension = mimeType.includes("mp4") ? "m4a" : "webm";
+  const blob = new Blob(recordingChunks, { type: mimeType });
+  const file = new File([blob], `live-voice-note-${timestamp}.${extension}`, { type: mimeType });
+  const note = appendUploadedVoiceNote(file);
+  note.time = `Queued recording ${formatElapsed(Date.now() - recordingStartedAt)}`;
+  setRecorderStatus("Live recording added as a queued voice note.");
+  recordingChunks = [];
+  renderFlow();
+}
+
 function playVoicePreview(note) {
   stopVoicePreview();
   playingVoiceNoteId = note.id;
@@ -1090,6 +1223,42 @@ function isAudioUpload(file) {
 
 function isTranscriptUpload(file) {
   return file.type?.startsWith("text/") || /\.(txt|md|markdown)$/i.test(file.name);
+}
+
+function queuedVoiceNoteFromFile(file, index, idPrefix = "UP") {
+  const id = `${idPrefix}-${String(index + 1).padStart(2, "0")}`;
+  const isAudio = isAudioUpload(file);
+  selectedVoiceNoteIds.add(id);
+  return {
+    id,
+    title: file.name,
+    time: isAudio ? "Queued audio" : "Queued transcript",
+    text: "Waiting for Step 4 domain context before transcription.",
+    url: isAudio ? URL.createObjectURL(file) : "",
+    uploaded: true,
+    transcriptionStatus: "queued",
+    transcriptionSource: "Queued upload",
+    file,
+  };
+}
+
+function replaceUploadedVoiceNotes(files, idPrefix = "UP") {
+  uploadedVoiceNotes.forEach((note) => {
+    if (note.url) URL.revokeObjectURL(note.url);
+  });
+  uploadedVoiceNotes = [...files].map((file, index) => queuedVoiceNoteFromFile(file, index, idPrefix));
+  isTranscribingVoiceNotes = false;
+  resetDraftEdits();
+  renderFlow();
+}
+
+function appendUploadedVoiceNote(file) {
+  const note = queuedVoiceNoteFromFile(file, uploadedVoiceNotes.length, "REC");
+  uploadedVoiceNotes = [...uploadedVoiceNotes, note];
+  isTranscribingVoiceNotes = false;
+  resetDraftEdits();
+  renderFlow();
+  return note;
 }
 
 function readTextFile(file) {
@@ -1571,7 +1740,7 @@ function renderFlow() {
   } else if (flowStep === 2 && hasParsingExampleFiles()) {
     els.flowNextButton.textContent = "Parsing examples...";
   }
-  els.flowNextButton.disabled = isTranscribingVoiceNotes || isGeneratingDraft;
+  els.flowNextButton.disabled = isTranscribingVoiceNotes || isGeneratingDraft || isRecordingVoiceNote;
 
   if (document.activeElement !== els.flowIntent) {
     els.flowIntent.value = projectIntent;
@@ -1615,6 +1784,10 @@ function renderFlow() {
   }));
   const allVoiceNotes = [...sampleVoiceNotes, ...uploadedVoiceNotes];
   els.flowVoiceNotes.innerHTML = allVoiceNotes.map(renderVoiceNoteRow).join("");
+  els.flowRecordVoiceButton.textContent = isRecordingVoiceNote ? "Stop recording" : "Record live note";
+  els.flowRecordVoiceButton.classList.toggle("is-recording", isRecordingVoiceNote);
+  els.flowRecorderStatus.classList.toggle("is-recording", isRecordingVoiceNote);
+  els.flowRecorderStatusText.textContent = recorderStatus;
   const selectedCount = allVoiceNotes.filter((note) => selectedVoiceNoteIds.has(note.id)).length;
   const playbackNote = playingVoiceNoteId ? " Playback preview is running." : "";
   const pendingCount = uploadedVoiceNotes.filter((note) => note.transcriptionStatus === "pending").length;
@@ -2132,6 +2305,7 @@ function render() {
 
 function selectDomain(domain) {
   stopVoicePreview();
+  cancelLiveRecording();
   activeDomain = domain;
   hasFollowUp = false;
   activeTab = "coach";
@@ -2229,6 +2403,13 @@ els.flowDocxButton.addEventListener("click", downloadDraftDocx);
 els.flowUploadVoiceButton.addEventListener("click", () => {
   els.flowVoiceUpload.click();
 });
+els.flowRecordVoiceButton.addEventListener("click", () => {
+  if (isRecordingVoiceNote) {
+    stopLiveRecording();
+  } else {
+    startLiveRecording();
+  }
+});
 els.flowVoiceNotes.addEventListener("change", (event) => {
   const checkbox = event.target.closest("[data-voice-select]");
   if (!checkbox) return;
@@ -2261,30 +2442,12 @@ els.flowVoiceNotes.addEventListener("click", (event) => {
 });
 els.flowVoiceUpload.addEventListener("change", async (event) => {
   stopVoicePreview();
-  uploadedVoiceNotes.forEach((file) => {
-    if (file.url) URL.revokeObjectURL(file.url);
-  });
+  if (isRecordingVoiceNote) {
+    cancelLiveRecording();
+  }
   const files = [...event.target.files];
   if (!files.length) return;
-  uploadedVoiceNotes = files.map((file, index) => {
-    const id = `UP-${String(index + 1).padStart(2, "0")}`;
-    const isAudio = isAudioUpload(file);
-    selectedVoiceNoteIds.add(id);
-    return {
-      id,
-      title: file.name,
-      time: isAudio ? "Queued audio" : "Queued transcript",
-      text: "Waiting for Step 4 domain context before transcription.",
-      url: isAudio ? URL.createObjectURL(file) : "",
-      uploaded: true,
-      transcriptionStatus: "queued",
-      transcriptionSource: "Queued upload",
-      file,
-    };
-  });
-  isTranscribingVoiceNotes = false;
-  resetDraftEdits();
-  renderFlow();
+  replaceUploadedVoiceNotes(files);
 });
 els.flowExampleLinks.addEventListener("input", (event) => {
   exampleLinksInput = event.target.value;
@@ -2396,6 +2559,7 @@ els.startProjectButton.addEventListener("click", () => {
 
 function showStartProject() {
   stopVoicePreview();
+  cancelLiveRecording();
   activeView = "flow";
   projectStarted = false;
   hasFollowUp = false;
@@ -2418,6 +2582,9 @@ els.homeStartButton.addEventListener("click", showStartProject);
 els.topbarStartButton.addEventListener("click", showStartProject);
 
 els.flowBackButton.addEventListener("click", () => {
+  if (isRecordingVoiceNote && flowStep === 1) {
+    cancelLiveRecording();
+  }
   flowStep = Math.max(0, flowStep - 1);
   if (flowStep !== 2) {
     isExampleDrawerOpen = false;
@@ -2480,6 +2647,7 @@ els.openDraftButton.addEventListener("click", () => {
 
 els.resetButton.addEventListener("click", () => {
   stopVoicePreview();
+  cancelLiveRecording();
   activeView = "home";
   projectStarted = false;
   hasFollowUp = false;
@@ -2503,6 +2671,7 @@ els.resetButton.addEventListener("click", () => {
 
 els.navStartOverButton.addEventListener("click", () => {
   stopVoicePreview();
+  cancelLiveRecording();
   activeView = "flow";
   projectStarted = false;
   hasFollowUp = false;

@@ -529,6 +529,57 @@ h1 {
   margin-top: 4px;
 }
 
+.record-action.is-recording {
+  border-color: rgba(180, 71, 62, 0.45);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.recorder-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 9px 10px;
+}
+
+.record-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.recorder-status.is-recording {
+  border-color: rgba(180, 71, 62, 0.32);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.recorder-status.is-recording .record-dot {
+  background: var(--red);
+  animation: pulse-recording 1s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.45);
+    opacity: 0.55;
+  }
+}
+
 .visually-hidden-file {
   position: absolute;
   width: 1px;
