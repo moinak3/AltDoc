@@ -2045,28 +2045,193 @@ function renderFlowDraft() {
   }
 }
 
+function compactText(value, limit = 180) {
+  const clean = String(value || "").replace(/\s+/g, " ").trim();
+  if (clean.length <= limit) return clean;
+  return `${clean.slice(0, limit).trim()}...`;
+}
+
+function meaningfulWords(value) {
+  const stopWords = new Set([
+    "about",
+    "after",
+    "again",
+    "also",
+    "because",
+    "before",
+    "being",
+    "between",
+    "could",
+    "draft",
+    "document",
+    "evidence",
+    "from",
+    "have",
+    "into",
+    "need",
+    "needs",
+    "should",
+    "that",
+    "their",
+    "there",
+    "these",
+    "this",
+    "through",
+    "with",
+    "what",
+    "when",
+    "where",
+    "which",
+    "while",
+    "will",
+    "write",
+  ]);
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 3 && !stopWords.has(word));
+}
+
+function textMatchesConcept(text, concept) {
+  const draftWords = new Set(meaningfulWords(text));
+  return meaningfulWords(concept).some((word) => draftWords.has(word));
+}
+
+function draftReadinessReport() {
+  const draft = getFlowDraftDocument();
+  const notes = selectedNotesForDraft();
+  const noteIds = new Set(notes.map((note) => note.id));
+  const paragraphs = draft.paragraphs || [];
+  const draftText = `${draft.title || ""}\n${paragraphs.map((paragraph) => paragraph.text).join("\n")}`;
+  const structure = targetStructureItems();
+  const usedNoteIds = new Set(
+    paragraphs.flatMap((paragraph) => paragraph.sources || []).filter((source) => noteIds.has(source)),
+  );
+  const paragraphCount = paragraphs.filter((paragraph) => paragraph.text.trim()).length;
+  const schemaMatches = structure.filter((item) => textMatchesConcept(draftText, `${item.heading} ${item.role}`));
+  const inferredParagraphs = paragraphs.filter((paragraph) =>
+    (paragraph.sources || []).some((source) => source === "AI inference" || !noteIds.has(source)),
+  );
+  const unsupportedLanguage = /\b(studies|research shows|evidence suggests|data shows|clinically proven|best|leader|preferred|significant|demonstrate|prove)\b/i.test(
+    draftText,
+  );
+  const missingStructure = structure.filter((item) => !schemaMatches.includes(item)).slice(0, 3);
+  const supportSources = usedNoteIds.size ? [...usedNoteIds] : notes.slice(0, 2).map((note) => note.id);
+  const hasUserProvidedNotes = notes.some((note) => note.isUserProvided);
+
+  let score = 42;
+  if (notes.length) score += 12;
+  if (usedNoteIds.size) score += 12;
+  if (paragraphCount >= 3) score += 10;
+  if (structure.length && schemaMatches.length) score += Math.round((schemaMatches.length / structure.length) * 14);
+  if (!inferredParagraphs.length) score += 6;
+  if (notes.length < 2) score -= 8;
+  if (missingStructure.length) score -= Math.min(12, missingStructure.length * 4);
+  if (unsupportedLanguage) score -= 6;
+  score = Math.max(28, Math.min(92, score));
+
+  const workingSummary = usedNoteIds.size
+    ? `The current draft is grounded in ${usedNoteIds.size} selected transcript${usedNoteIds.size === 1 ? "" : "s"} and is moving toward ${projectOutputShape || "the target document"}.`
+    : `The current draft has a visible direction, but it needs stronger grounding in selected transcript evidence before it is ready.`;
+
+  const support = [
+    {
+      title: "Grounded in selected input",
+      text: usedNoteIds.size
+        ? hasUserProvidedNotes
+          ? `The draft cites the selected user-provided source${usedNoteIds.size === 1 ? "" : "s"} instead of relying on sample notes.`
+          : `The draft cites the currently selected source${usedNoteIds.size === 1 ? "" : "s"}.`
+        : "The draft has editable prose, but no selected transcript is clearly cited yet.",
+      sources: supportSources.length ? supportSources : ["Current draft"],
+    },
+    {
+      title: "Clear working direction",
+      text: projectIntent
+        ? `The current draft is being evaluated against this stated intent: ${compactText(projectIntent, 160)}`
+        : `The current draft has a basic document shape, but the project intent should be sharpened.`,
+      sources: ["Project context"],
+    },
+  ];
+
+  if (schemaMatches.length) {
+    support.push({
+      title: "Some target structure is present",
+      text: `The draft already gestures toward ${schemaMatches
+        .slice(0, 2)
+        .map((item) => item.heading)
+        .join(" and ")}.`,
+      sources: ["Target document schema"],
+    });
+  }
+
+  const gaps = [];
+  if (missingStructure.length) {
+    gaps.push({
+      title: "Missing target structure",
+      kind: "warning",
+      text: `To become the target document, the draft still needs clearer coverage of: ${missingStructure
+        .map((item) => item.heading)
+        .join(", ")}.`,
+      sources: ["Target document schema"],
+    });
+  }
+  if (notes.length < 2) {
+    gaps.push({
+      title: "Needs more source depth",
+      kind: "warning",
+      text:
+        "Only one selected transcript is currently feeding the draft. Record one more note with concrete examples, evidence, or objections before treating this as complete.",
+      sources: notes.length ? notes.map((note) => note.id) : ["Current draft"],
+    });
+  }
+  if (unsupportedLanguage || inferredParagraphs.length) {
+    gaps.push({
+      title: "Claims need tighter support",
+      kind: "risk",
+      text:
+        "The draft contains broad or inferred claims. Tighten them by linking each claim to a transcript detail, a provided example, or a cited source.",
+      sources: inferredParagraphs.length ? ["AI inference"] : supportSources.length ? supportSources : ["Current draft"],
+    });
+  }
+  gaps.push({
+    title: "Next input to record",
+    kind: "warning",
+    text: `Record a follow-up note answering: what concrete evidence, example, or counterpoint would make this ${projectOutputShape || "document"} convincing to the intended reader?`,
+    sources: ["Project context", "Target document schema"],
+  });
+
+  return {
+    score,
+    workingSummary,
+    support,
+    gaps,
+  };
+}
+
 function renderFlowReadiness() {
-  const scenario = getScenario();
-  els.flowScoreValue.textContent = scenario.readiness;
-  els.flowThesisText.textContent = scenario.thesis;
-  els.flowSupportList.innerHTML = scenario.support
+  const report = draftReadinessReport();
+  els.flowScoreValue.textContent = report.score;
+  els.flowThesisText.textContent = report.workingSummary;
+  els.flowSupportList.innerHTML = report.support
     .map(
       (item) => `
         <article class="issue-card">
-          <strong>${item.title}</strong>
-          <p>${item.text}</p>
-          <div class="source-row">${item.sources.map(sourcePill).join("")}</div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p>${escapeHtml(item.text)}</p>
+          <div class="source-row">${item.sources.map((source) => sourcePill(escapeHtml(source))).join("")}</div>
         </article>
       `,
     )
     .join("");
-  els.flowGapList.innerHTML = scenario.gaps
+  els.flowGapList.innerHTML = report.gaps
     .map(
       (item) => `
         <article class="issue-card" data-kind="${item.kind}">
-          <strong>${item.title}</strong>
-          <p>${item.text}</p>
-          <div class="source-row">${item.sources.map(sourcePill).join("")}</div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p>${escapeHtml(item.text)}</p>
+          <div class="source-row">${item.sources.map((source) => sourcePill(escapeHtml(source))).join("")}</div>
         </article>
       `,
     )
@@ -2769,6 +2934,10 @@ els.flowBackButton.addEventListener("click", () => {
 els.flowNextButton.addEventListener("click", async () => {
   const totalSteps = document.querySelectorAll(".flow-step").length;
   els.flowNextButton.disabled = true;
+  if (flowStep === 4 && els.flowDraftBody?.querySelector("[data-draft-paragraph]")) {
+    editedDraft = collectDraftFromEditor();
+    draftHasUnsavedChanges = false;
+  }
   if (flowStep === 2 && hasParsingExampleFiles()) {
     renderFlow();
     return;
