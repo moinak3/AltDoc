@@ -195,13 +195,22 @@ h1 {
 }
 
 .view-home .topbar-cta {
-  border-color: rgba(255, 255, 255, 0.85);
-  background: white;
-  color: var(--teal);
+  border-color: rgba(17, 24, 32, 0.92);
+  background: var(--nav);
+  color: white;
+  box-shadow: 0 10px 24px rgba(17, 24, 32, 0.22);
 }
 
 .view-home .topbar-cta:hover {
-  background: #f5fffe;
+  border-color: var(--nav);
+  background: #253241;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.view-home .topbar-cta:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 2px;
 }
 
 .plan-label {
@@ -250,7 +259,7 @@ h1 {
 
 .topbar-cta {
   min-height: 36px;
-  min-width: 94px;
+  min-width: 108px;
   white-space: nowrap;
 }
 
