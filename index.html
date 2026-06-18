@@ -386,7 +386,14 @@
                     multiple
                   />
                   <label class="secondary-action file-action" id="flowUploadExampleButton" for="flowExampleUpload">Choose example files</label>
-                  <p class="subtle-copy" id="flowExampleUploadStatus">Prototype note: uploaded examples are listed locally; parsing is stubbed.</p>
+                  <p class="subtle-copy" id="flowExampleUploadStatus">Uploaded text/Markdown examples are parsed for headings; PDF/DOCX examples contribute filename-inferred structure.</p>
+                </section>
+                <section class="target-structure" aria-label="Target document structure">
+                  <div>
+                    <strong>Target document structure</strong>
+                    <p>AltDoc combines selected templates, linked examples, and imported examples into the output outline it will use for drafting.</p>
+                  </div>
+                  <div id="flowTargetStructure" class="target-structure-list"></div>
                 </section>
               </div>
             </div>
@@ -780,6 +787,6 @@
       </aside>
     </div>
 
-    <script src="app.js?v=transcription-v1"></script>
+    <script src="app.js?v=target-structure-v1"></script>
   </body>
 </html>

@@ -532,6 +532,7 @@ const els = {
   flowExampleUpload: document.querySelector("#flowExampleUpload"),
   flowUploadExampleButton: document.querySelector("#flowUploadExampleButton"),
   flowExampleUploadStatus: document.querySelector("#flowExampleUploadStatus"),
+  flowTargetStructure: document.querySelector("#flowTargetStructure"),
   exampleDrawer: document.querySelector("#exampleDrawer"),
   closeExampleDrawer: document.querySelector("#closeExampleDrawer"),
   exampleDrawerContent: document.querySelector("#exampleDrawerContent"),
@@ -610,6 +611,161 @@ function parseExampleLinks(input) {
     .slice(0, 8);
 }
 
+function titleFromFileName(name) {
+  return String(name || "Uploaded example")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function titleFromLink(link, index) {
+  try {
+    const url = new URL(link);
+    const lastPath = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .pop();
+    return titleFromFileName(lastPath || url.hostname.replace(/^www\./, ""));
+  } catch {
+    return `Linked example ${index + 1}`;
+  }
+}
+
+function inferSectionRole(heading) {
+  const normalized = heading.toLowerCase();
+  if (/(question|problem|context|background|setup)/.test(normalized)) return "Set up the reader and define the problem.";
+  if (/(answer|claim|thesis|recommendation|decision)/.test(normalized)) return "State the governing answer or central claim.";
+  if (/(evidence|analysis|application|rationale|mechanism)/.test(normalized)) return "Develop the argument with support and reasoning.";
+  if (/(counter|objection|risk|limitation|caveat|tradeoff)/.test(normalized)) return "Pressure-test the argument and name constraints.";
+  if (/(gap|next|change|implication|conclusion)/.test(normalized)) return "Close with implications, open questions, or next steps.";
+  return "Contribute a reusable section pattern from the example.";
+}
+
+function parseTextExampleStructure(text, fallbackTitle) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const headingLines = lines
+    .filter((line) => /^(#{1,3}\s+|[0-9]+[.)]\s+|[A-Z][A-Za-z\s/-]{3,}:?$)/.test(line))
+    .map((line) => line.replace(/^#{1,3}\s+/, "").replace(/^[0-9]+[.)]\s+/, "").replace(/:$/, "").trim())
+    .filter((line) => line.length > 2 && line.length < 80)
+    .slice(0, 6);
+
+  const headings = headingLines.length
+    ? headingLines
+    : ["Opening context", "Core argument", "Evidence and examples", "Open questions"];
+
+  return headings.map((heading) => ({
+    heading,
+    role: inferSectionRole(heading),
+    sources: [fallbackTitle],
+  }));
+}
+
+function inferUploadedExampleStructure(file) {
+  const title = file.title || titleFromFileName(file.name);
+  if (file.sections?.length) {
+    return file.sections.map((section) => ({
+      ...section,
+      sources: [title],
+    }));
+  }
+  const lowerName = String(file.name || "").toLowerCase();
+  if (lowerName.includes("memo")) {
+    return ["Context", "Recommendation", "Evidence", "Risks", "Next steps"].map((heading) => ({
+      heading,
+      role: inferSectionRole(heading),
+      sources: [title],
+    }));
+  }
+  if (lowerName.includes("thesis") || lowerName.includes("chapter")) {
+    return ["Field setup", "Central claim", "Mechanism", "Counterargument", "Implication"].map((heading) => ({
+      heading,
+      role: inferSectionRole(heading),
+      sources: [title],
+    }));
+  }
+  return ["Opening context", "Main claim", "Supporting evidence", "Caveats", "Conclusion"].map((heading) => ({
+    heading,
+    role: inferSectionRole(heading),
+    sources: [title],
+  }));
+}
+
+function linkedExampleStructure(link, index) {
+  const title = titleFromLink(link, index);
+  return ["Context", "Core claim", "Evidence pattern", "Implications"].map((heading) => ({
+    heading,
+    role: inferSectionRole(heading),
+    sources: [title],
+  }));
+}
+
+function normalizeStructureHeading(heading) {
+  const normalized = heading.toLowerCase();
+  if (/(question|problem|context|background|setup|field)/.test(normalized)) return "Context and problem";
+  if (/(answer|claim|thesis|recommendation|decision)/.test(normalized)) return "Thesis or recommendation";
+  if (/(mechanism|analysis|application|rationale)/.test(normalized)) return "Reasoning and mechanism";
+  if (/(evidence|authority|case|example|study)/.test(normalized)) return "Evidence pattern";
+  if (/(counter|objection|risk|limitation|caveat|tradeoff)/.test(normalized)) return "Counterarguments and limits";
+  if (/(gap|next|change|implication|conclusion|unresolved)/.test(normalized)) return "Implications and next steps";
+  return heading;
+}
+
+function targetStructureItems() {
+  const items = [];
+  selectedSuggestedExampleIds.forEach((id) => {
+    const example = getSuggestedExample(id);
+    example.sections.forEach((section) => {
+      items.push({
+        heading: normalizeStructureHeading(section.heading),
+        role: inferSectionRole(section.heading),
+        sources: [example.title],
+      });
+    });
+  });
+
+  parseExampleLinks(exampleLinksInput).forEach((link, index) => {
+    items.push(...linkedExampleStructure(link, index));
+  });
+
+  uploadedExampleFiles.forEach((file) => {
+    items.push(...inferUploadedExampleStructure(file));
+  });
+
+  const merged = new Map();
+  items.forEach((item) => {
+    const key = normalizeStructureHeading(item.heading);
+    const existing = merged.get(key);
+    if (existing) {
+      existing.sources = [...new Set([...existing.sources, ...item.sources])].slice(0, 4);
+    } else {
+      merged.set(key, {
+        heading: key,
+        role: item.role,
+        sources: [...new Set(item.sources)].slice(0, 4),
+      });
+    }
+  });
+
+  const order = [
+    "Context and problem",
+    "Thesis or recommendation",
+    "Reasoning and mechanism",
+    "Evidence pattern",
+    "Counterarguments and limits",
+    "Implications and next steps",
+  ];
+  return [...merged.values()].sort((a, b) => {
+    const aIndex = order.indexOf(a.heading);
+    const bIndex = order.indexOf(b.heading);
+    return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+  });
+}
+
 function getSuggestedExample(id) {
   return suggestedExampleDocs.find((example) => example.id === id) || suggestedExampleDocs[0];
 }
@@ -675,6 +831,33 @@ function renderExampleDrawer() {
         .join("")}
     </div>
   `;
+}
+
+function renderTargetStructure() {
+  const items = targetStructureItems();
+  if (!items.length) {
+    els.flowTargetStructure.innerHTML = `
+      <div class="target-structure-empty">
+        Select templates or add examples to generate a target document structure.
+      </div>
+    `;
+    return;
+  }
+
+  els.flowTargetStructure.innerHTML = items
+    .map(
+      (item, index) => `
+        <article class="target-structure-item">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <div>
+            <strong>${escapeHtml(item.heading)}</strong>
+            <p>${escapeHtml(item.role)}</p>
+            <small>Learned from ${item.sources.map(escapeHtml).join(", ")}</small>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
 }
 
 function renderDomainOptions() {
@@ -1174,13 +1357,15 @@ function renderFlow() {
           <div class="example-item imported">
             <strong>Uploaded example ${index + 1}</strong>
             <p>${escapeHtml(file.name)}</p>
+            <small>${escapeHtml(file.status || "Parsed into target structure")}</small>
           </div>
         `,
     ),
   ].join("");
   els.flowExampleUploadStatus.textContent = uploadedExampleFiles.length
-    ? `${uploadedExampleFiles.length} uploaded example file${uploadedExampleFiles.length === 1 ? "" : "s"} added as local prototype inputs. Parsing is stubbed.`
-    : "Prototype note: uploaded examples are listed locally; parsing is stubbed.";
+    ? `${uploadedExampleFiles.length} uploaded example file${uploadedExampleFiles.length === 1 ? "" : "s"} parsed into the target document structure.`
+    : "Uploaded text/Markdown examples are parsed for headings; PDF/DOCX examples contribute filename-inferred structure in this prototype.";
+  renderTargetStructure();
   renderExampleDrawer();
   renderFlowDraft();
   renderFlowReadiness();
@@ -1800,10 +1985,45 @@ els.flowExampleLinks.addEventListener("input", (event) => {
   exampleLinksInput = event.target.value;
   renderFlow();
 });
-els.flowExampleUpload.addEventListener("change", (event) => {
-  uploadedExampleFiles = [...event.target.files].map((file) => ({
+els.flowExampleUpload.addEventListener("change", async (event) => {
+  const files = [...event.target.files];
+  uploadedExampleFiles = files.map((file) => ({
     name: file.name,
+    title: titleFromFileName(file.name),
+    sections: [],
+    status: "Parsing",
   }));
+  renderFlow();
+
+  uploadedExampleFiles = await Promise.all(
+    files.map(async (file) => {
+      const title = titleFromFileName(file.name);
+      if (isTranscriptUpload(file)) {
+        try {
+          const text = await readTextFile(file);
+          return {
+            name: file.name,
+            title,
+            sections: parseTextExampleStructure(text, title),
+            status: "Parsed text structure",
+          };
+        } catch {
+          return {
+            name: file.name,
+            title,
+            sections: inferUploadedExampleStructure({ name: file.name, title }),
+            status: "Filename-inferred structure",
+          };
+        }
+      }
+      return {
+        name: file.name,
+        title,
+        sections: inferUploadedExampleStructure({ name: file.name, title }),
+        status: "Filename-inferred structure",
+      };
+    }),
+  );
   renderFlow();
 });
 els.flowExamples.addEventListener("click", (event) => {
