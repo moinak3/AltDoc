@@ -540,7 +540,6 @@ const els = {
   flowRecorderStatus: document.querySelector("#flowRecorderStatus"),
   flowRecorderStatusText: document.querySelector("#flowRecorderStatusText"),
   flowUploadStatus: document.querySelector("#flowUploadStatus"),
-  flowAddVoiceButton: document.querySelector("#flowAddVoiceButton"),
   flowExamples: document.querySelector("#flowExamples"),
   flowExampleLinks: document.querySelector("#flowExampleLinks"),
   flowExampleUpload: document.querySelector("#flowExampleUpload"),
@@ -1548,6 +1547,17 @@ function renderVoiceNoteRow(note) {
   `;
 }
 
+function renderRecordButtonContent() {
+  const iconPath = isRecordingVoiceNote
+    ? '<path d="M8 8h8v8H8z" />'
+    : '<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z" /><path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1a7 7 0 0 0 6-6.9h-2z" />';
+  const label = isRecordingVoiceNote ? "Stop recording" : "Record live note";
+  els.flowRecordVoiceButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true">${iconPath}</svg>
+    <span>${label}</span>
+  `;
+}
+
 function getDraftTitle() {
   const fallbackTitles = {
     legal: "Algorithmic Agency Action and the Shift Toward Reason-Giving",
@@ -1784,7 +1794,7 @@ function renderFlow() {
   }));
   const allVoiceNotes = [...sampleVoiceNotes, ...uploadedVoiceNotes];
   els.flowVoiceNotes.innerHTML = allVoiceNotes.map(renderVoiceNoteRow).join("");
-  els.flowRecordVoiceButton.textContent = isRecordingVoiceNote ? "Stop recording" : "Record live note";
+  renderRecordButtonContent();
   els.flowRecordVoiceButton.classList.toggle("is-recording", isRecordingVoiceNote);
   els.flowRecorderStatus.classList.toggle("is-recording", isRecordingVoiceNote);
   els.flowRecorderStatusText.textContent = recorderStatus;
@@ -2622,11 +2632,6 @@ els.flowNextButton.addEventListener("click", async () => {
   if (flowStep !== 1) {
     stopVoicePreview();
   }
-  render();
-});
-
-els.flowAddVoiceButton.addEventListener("click", () => {
-  flowStep = 2;
   render();
 });
 

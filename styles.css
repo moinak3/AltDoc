@@ -2266,6 +2266,13 @@ select:focus {
   font-weight: 720;
 }
 
+.secondary-action svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: currentColor;
+}
+
 .primary-action {
   border: 1px solid rgba(47, 123, 117, 0.75);
   background: linear-gradient(180deg, #0a928d, var(--teal));

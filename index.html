@@ -348,9 +348,20 @@
                   accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.txt,.md"
                   multiple
                 />
-                <button class="secondary-action" id="flowUploadVoiceButton" type="button">Upload voice notes</button>
-                <button class="secondary-action record-action" id="flowRecordVoiceButton" type="button">Record live note</button>
-                <button class="secondary-action" id="flowAddVoiceButton" type="button">Use sample voice notes</button>
+                <button class="secondary-action" id="flowUploadVoiceButton" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3 6.5 8.5l1.4 1.4 3.1-3.1V16h2V6.8l3.1 3.1 1.4-1.4L12 3z" />
+                    <path d="M5 18h14v2H5z" />
+                  </svg>
+                  <span>Upload voice notes</span>
+                </button>
+                <button class="secondary-action record-action" id="flowRecordVoiceButton" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z" />
+                    <path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1a7 7 0 0 0 6-6.9h-2z" />
+                  </svg>
+                  <span>Record live note</span>
+                </button>
               </div>
               <div class="recorder-status" id="flowRecorderStatus" aria-live="polite">
                 <span class="record-dot" aria-hidden="true"></span>
