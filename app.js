@@ -997,9 +997,33 @@ function resetSelectedVoiceNotes() {
 }
 
 function deselectSampleVoiceNotes() {
-  getScenario().notes.forEach((note) => {
-    selectedVoiceNoteIds.delete(note.id);
+  Object.values(scenarios).forEach((scenario) => {
+    scenario.notes.forEach((note) => {
+      selectedVoiceNoteIds.delete(note.id);
+    });
   });
+}
+
+function selectedReadyUploadedNotes() {
+  return uploadedVoiceNotes.filter((note) => selectedVoiceNoteIds.has(note.id) && isReadyVoiceNote(note) && note.text);
+}
+
+function reconcileSelectedVoiceNotesForDomain(previousDomain, nextDomain) {
+  const previousSampleIds = new Set((scenarios[previousDomain]?.notes || []).map((note) => note.id));
+  const nextSampleIds = (scenarios[nextDomain]?.notes || []).map((note) => note.id);
+  const selectedUploadedIds = uploadedVoiceNotes
+    .filter((note) => selectedVoiceNoteIds.has(note.id))
+    .map((note) => note.id);
+  const hadOnlyPreviousSamples =
+    selectedVoiceNoteIds.size > 0 && [...selectedVoiceNoteIds].every((id) => previousSampleIds.has(id));
+
+  previousSampleIds.forEach((id) => {
+    selectedVoiceNoteIds.delete(id);
+  });
+
+  if (!selectedUploadedIds.length && !uploadedVoiceNotes.length && hadOnlyPreviousSamples) {
+    nextSampleIds.forEach((id) => selectedVoiceNoteIds.add(id));
+  }
 }
 
 function resetSuggestedExamples() {
@@ -1442,8 +1466,7 @@ async function ensureVoiceTranscriptionsReady() {
 }
 
 function selectedNotesForDraft() {
-  const uploadedNotes = uploadedVoiceNotes
-    .filter(isReadyVoiceNote)
+  const uploadedNotes = selectedReadyUploadedNotes()
     .map((note) => ({
       id: note.id,
       title: note.title,
@@ -1460,7 +1483,10 @@ function selectedNotesForDraft() {
     transcriptionSource: "Sample transcript",
     isUserProvided: false,
   }));
-  return [...uploadedNotes, ...scenarioNotes].filter((note) => selectedVoiceNoteIds.has(note.id) && note.text);
+  if (uploadedNotes.length) {
+    return uploadedNotes;
+  }
+  return scenarioNotes.filter((note) => selectedVoiceNoteIds.has(note.id) && note.text);
 }
 
 async function generateTraceableDraft() {
@@ -1572,6 +1598,18 @@ function renderRecordButtonContent() {
   `;
 }
 
+function titleFromProjectIntent() {
+  const cleaned = projectIntent
+    .replace(/\s+/g, " ")
+    .replace(/^(write|draft|create|prepare)\s+(a|an|the)?\s*/i, "")
+    .replace(/^(research memo|brief|thesis section|policy brief|strategy narrative|memo)\s+(about|on|arguing that|for)?\s*/i, "")
+    .trim();
+  if (!cleaned) return "";
+  const shortTitle = cleaned.split(/[.!?]/)[0].trim();
+  if (!shortTitle) return "";
+  return shortTitle.length > 110 ? `${shortTitle.slice(0, 110).trim()}...` : shortTitle;
+}
+
 function getDraftTitle() {
   const fallbackTitles = {
     legal: "Algorithmic Agency Action and the Shift Toward Reason-Giving",
@@ -1588,7 +1626,7 @@ function getDraftTitle() {
   if (intent.includes("algorithmic") || intent.includes("administrative") || intent.includes("law")) {
     return fallbackTitles.legal;
   }
-  return fallbackTitles[activeDomain] || `${projectOutputShape || "Draft"} from Voice Notes`;
+  return titleFromProjectIntent() || `${projectOutputShape || "Draft"} from Voice Notes`;
 }
 
 function clipDraftSourceText(text, limit = 520) {
@@ -2434,14 +2472,19 @@ function render() {
 function selectDomain(domain) {
   stopVoicePreview();
   cancelLiveRecording();
+  const previousDomain = activeDomain;
+  const previousDefaultIntent = scenarios[previousDomain]?.intent || "";
+  const shouldUseDomainDefaultIntent = activeView !== "flow" && projectIntent === previousDefaultIntent;
   activeDomain = domain;
   hasFollowUp = false;
   activeTab = "coach";
-  projectIntent = scenarios[domain].intent;
+  if (shouldUseDomainDefaultIntent) {
+    projectIntent = scenarios[domain].intent;
+  }
   isOtherOutputShape = false;
   resetDraftEdits();
   resetFollowUpVoiceNotes();
-  resetSelectedVoiceNotes();
+  reconcileSelectedVoiceNotesForDomain(previousDomain, domain);
   render();
 }
 

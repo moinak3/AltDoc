@@ -96,6 +96,7 @@ module.exports = async function draft(request, response) {
   const requiredSourceIds = [...new Set([...explicitRequiredSourceIds, ...inferredRequiredSourceIds])].filter((id) =>
     notes.some((note) => note.id === id),
   );
+  const generationNotes = requiredSourceIds.length ? notes.filter((note) => requiredSourceIds.includes(note.id)) : notes;
 
   if (!notes.length) {
     response.status(400).json({ error: "No transcribed voice notes were provided for draft generation." });
@@ -103,7 +104,7 @@ module.exports = async function draft(request, response) {
   }
 
   const allowedSources = new Set([
-    ...notes.map((note) => note.id),
+    ...generationNotes.map((note) => note.id),
     "Project context",
     "Target document schema",
     "Domain context",
@@ -119,7 +120,7 @@ module.exports = async function draft(request, response) {
     primingWords: cleanList(body.primingWords, 80),
     targetStructure,
     requiredSourceIds,
-    notes,
+    notes: generationNotes,
   };
 
   const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -166,7 +167,7 @@ module.exports = async function draft(request, response) {
   const usedSources = new Set(paragraphs.flatMap((paragraph) => paragraph.sources));
   requiredSourceIds.forEach((id) => {
     if (usedSources.has(id)) return;
-    const note = notes.find((item) => item.id === id);
+    const note = generationNotes.find((item) => item.id === id);
     if (!note) return;
     paragraphs.push({
       text: `${note.title} adds this source material to the draft: ${note.text.slice(0, 700)}${note.text.length > 700 ? "..." : ""}`,
