@@ -33,7 +33,7 @@
             </svg>
             <input type="search" placeholder="Search project..." />
           </label>
-          <span class="truth-label">Prototype: transcription enabled; AI outputs are simulated</span>
+          <span class="truth-label">Demo workspace</span>
           <button class="secondary-action topbar-cta" id="topbarStartButton" type="button">
             Get started
           </button>
@@ -49,11 +49,10 @@
         <section class="home-hero" id="what-it-does">
           <div class="hero-copy">
             <span class="home-kicker">From raw ideas to argument-ready documents</span>
-            <h2>Capture messy thinking before it disappears. Shape it into a document you can trust.</h2>
+            <h2>Turn voice notes into an argument-ready draft.</h2>
             <p>
-              AltDoc helps you capture the unstructured thoughts where original ideas often
-              begin, define what the final document should become, and close the gaps between
-              your raw material and a traceable, argument-ready draft.
+              Start with a document goal, add voice notes and examples, then let AltDoc prime the
+              domain, find gaps, and generate a source-linked draft.
             </p>
             <div class="hero-actions">
               <button class="primary-action hero-button" id="homeStartButton" type="button">
@@ -130,9 +129,8 @@
             <span class="section-kicker">Problem</span>
             <h2>Great ideas get stuck between speaking and writing.</h2>
             <p>
-              The most original ideas often show up before they are organized enough to write.
-              Voice makes them easy to capture, but hard to structure, evaluate, and turn into a
-              finished document.
+              Voice is fast enough for original thinking, but the material rarely arrives as a
+              document. AltDoc turns those fragments into structure before drafting begins.
             </p>
           </div>
           <div class="audience-grid">
@@ -154,7 +152,7 @@
         <section class="what-section">
           <div class="section-intro centered">
             <span class="section-kicker">AltDoc's approach</span>
-            <h2>Guide raw ideas toward the document they need to become.</h2>
+            <h2>Domain-primed voice notes for serious long-form writing.</h2>
           </div>
           <div class="value-grid">
             <article>
@@ -338,7 +336,7 @@
           <section class="flow-step is-hidden" data-flow-step="1">
             <span class="home-kicker">Add voice notes</span>
             <h2>Import the voice notes for this project.</h2>
-            <p>Import the voice notes at this step, after which the transcription will happen.</p>
+            <p>Add voice notes now. AltDoc will transcribe them after it has your domain context.</p>
             <div class="flow-upload-card">
               <strong>Voice notes loaded</strong>
               <div id="flowVoiceNotes" class="flow-file-list"></div>
@@ -401,8 +399,8 @@
 
           <section class="flow-step is-hidden" data-flow-step="3">
             <span class="home-kicker">Prime the domain</span>
-            <h2>Any domain context AltDoc should know?</h2>
-            <p>This step is optional. Paste domain vocabulary or import context files so AltDoc can parse them and create a priming list for transcription accuracy.</p>
+            <h2>Prime transcription with domain context.</h2>
+            <p>Add names, terms, citations, acronyms, or glossary files so AltDoc can recognize specialized language before transcription.</p>
             <label class="field-label" for="flowDomainSelect">Domain</label>
             <select id="flowDomainSelect"></select>
             <div class="start-preview">
@@ -442,14 +440,19 @@
 
           <section class="flow-step is-hidden" data-flow-step="4">
             <span class="home-kicker">Traceable draft</span>
-            <h2>Here is the current draft.</h2>
-            <p>Each paragraph links back to voice notes, project context, or target examples.</p>
+            <h2>Your source-linked draft is ready.</h2>
+            <p>Review the draft, inspect its footnotes, and export the current on-screen version.</p>
             <article class="draft-preview flow-output">
               <div class="draft-toolbar">
                 <span>Current Draft</span>
                 <div class="draft-actions">
                   <button class="primary-action" id="flowDocxButton" type="button">Export document</button>
                 </div>
+              </div>
+              <div class="draft-payoff" id="flowDraftPayoff">
+                <span>Generated from 3 notes</span>
+                <span>6-part target structure</span>
+                <span>3 source-linked paragraphs</span>
               </div>
               <div class="draft-viewer" aria-label="Current draft viewer">
                 <h3 id="flowDraftTitle"></h3>
@@ -791,6 +794,6 @@
       </aside>
     </div>
 
-    <script src="app.js?v=model-generated-draft-v1"></script>
+    <script src="app.js?v=copy-visual-polish-v1"></script>
   </body>
 </html>

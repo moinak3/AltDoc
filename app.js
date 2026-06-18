@@ -548,6 +548,7 @@ const els = {
   flowDraftBody: document.querySelector("#flowDraftBody"),
   flowDraftTitle: document.querySelector("#flowDraftTitle"),
   flowDraftFootnotes: document.querySelector("#flowDraftFootnotes"),
+  flowDraftPayoff: document.querySelector("#flowDraftPayoff"),
   flowDocxButton: document.querySelector("#flowDocxButton"),
   flowExportStatus: document.querySelector("#flowExportStatus"),
   flowScoreValue: document.querySelector("#flowScoreValue"),
@@ -1340,7 +1341,7 @@ async function ensureGeneratedDraftReady() {
         sources: paragraph.sources,
       })),
     };
-    draftGenerationMessage = `${error.message || "Draft generation failed."} Showing the prototype fallback draft.`;
+    draftGenerationMessage = friendlyDraftGenerationMessage(error);
   } finally {
     isGeneratingDraft = false;
     renderFlow();
@@ -1500,6 +1501,14 @@ function markDraftDirty() {
   editedDraft = collectDraftFromEditor();
   draftHasUnsavedChanges = true;
   els.flowExportStatus.textContent = "Edits are included automatically when you export this document.";
+}
+
+function friendlyDraftGenerationMessage(error) {
+  const message = String(error?.message || "");
+  if (/api key|OPENAI_API_KEY|OpenAI|model|quota|rate limit/i.test(message)) {
+    return "Draft generation is temporarily unavailable. Showing a sample traceable draft.";
+  }
+  return `${message || "Draft generation is temporarily unavailable."} Showing a sample traceable draft.`;
 }
 
 function getExportDraftDocument() {
@@ -1681,6 +1690,15 @@ function renderFlowDraft() {
       )
       .join("")}
   `;
+  if (els.flowDraftPayoff) {
+    const selectedNoteCount = selectedNotesForDraft().length;
+    const schemaCount = targetStructureItems().length || 1;
+    els.flowDraftPayoff.innerHTML = `
+      <span>Generated from ${selectedNoteCount} note${selectedNoteCount === 1 ? "" : "s"}</span>
+      <span>${schemaCount}-part target structure</span>
+      <span>${draft.paragraphs.length} source-linked paragraph${draft.paragraphs.length === 1 ? "" : "s"}</span>
+    `;
+  }
   if (!draftHasUnsavedChanges && !els.flowExportStatus.textContent.includes("Exported")) {
     els.flowExportStatus.textContent =
       draftGenerationMessage ||

@@ -1180,8 +1180,15 @@ h1 {
   padding: 30px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.what-section,
+.audience-section,
+.how-section {
+  border-color: rgba(216, 224, 231, 0.64);
+  background: transparent;
+  box-shadow: none;
 }
 
 .section-intro {
@@ -2460,6 +2467,26 @@ select:focus {
   font-weight: 760;
 }
 
+.draft-payoff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfcfd;
+  padding: 10px 12px;
+}
+
+.draft-payoff span {
+  border: 1px solid rgba(8, 125, 122, 0.18);
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1;
+  padding: 7px 9px;
+}
+
 .draft-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2769,6 +2796,7 @@ select:focus {
 
   .topbar-actions {
     width: 100%;
+    justify-content: flex-start;
   }
 
   .search-control {
@@ -2776,12 +2804,24 @@ select:focus {
   }
 
   .marketing-nav {
-    overflow-x: auto;
-    padding-bottom: 2px;
+    display: none;
   }
 
-  .marketing-nav a {
-    white-space: nowrap;
+  .view-home .topbar-cta {
+    display: inline-flex;
+  }
+
+  .view-home .topbar-actions {
+    width: auto;
+  }
+
+  .view-home .topbar {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .view-home .brand {
+    flex: 1 1 auto;
   }
 
   .start-copy h2 {
@@ -2805,6 +2845,16 @@ select:focus {
   .readiness-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .view-home .topbar {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .view-home .topbar-actions {
+    flex: 0 0 auto;
+    width: auto;
   }
 
   .topbar-actions,
