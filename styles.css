@@ -2458,32 +2458,6 @@ select:focus {
   padding: 10px 12px 12px;
 }
 
-.google-docs-handoff {
-  margin: 0 12px 14px;
-  border: 1px solid rgba(47, 123, 117, 0.26);
-  border-radius: 8px;
-  background: rgba(226, 245, 243, 0.74);
-  padding: 14px;
-}
-
-.google-docs-handoff strong {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--teal-deep);
-  font-size: 13px;
-}
-
-.google-docs-handoff p {
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.google-docs-handoff a {
-  text-decoration: none;
-}
-
 @media (max-width: 1180px) {
   .topbar {
     align-items: flex-start;

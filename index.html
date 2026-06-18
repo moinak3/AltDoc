@@ -437,8 +437,7 @@
                 <span>Current Draft</span>
                 <div class="draft-actions">
                   <button class="secondary-action" id="flowSaveDraftButton" type="button">Save draft</button>
-                  <button class="secondary-action" id="flowGoogleDocsButton" type="button">Export to Google Docs</button>
-                  <button class="primary-action" id="flowDocxButton" type="button">Download .docx</button>
+                  <button class="primary-action" id="flowDocxButton" type="button">Export document</button>
                 </div>
               </div>
               <div class="draft-viewer" aria-label="Current draft viewer">
@@ -447,7 +446,6 @@
                 <div id="flowDraftFootnotes" class="draft-footnotes"></div>
               </div>
               <p class="subtle-copy export-status" id="flowExportStatus">Traceability appears as footnotes in this viewer and export.</p>
-              <div class="google-docs-handoff is-hidden" id="flowGoogleDocsHandoff" aria-live="polite"></div>
             </article>
           </section>
 
@@ -782,6 +780,6 @@
       </aside>
     </div>
 
-    <script src="app.js?v=google-docs-import-v1"></script>
+    <script src="app.js?v=export-document-v1"></script>
   </body>
 </html>
