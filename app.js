@@ -497,6 +497,8 @@ let uploadedContextFiles = {
 let contextPrimingWords = [];
 let editedDraft = null;
 let draftHasUnsavedChanges = false;
+let isGeneratingDraft = false;
+let draftGenerationMessage = "";
 let uploadedVoiceNotes = [];
 let isTranscribingVoiceNotes = false;
 let followUpVoiceNotes = [];
@@ -697,6 +699,10 @@ function refreshContextPrimingWords() {
 
 function hasParsingContextFiles() {
   return [...uploadedContextFiles.csv, ...uploadedContextFiles.markdown].some((file) => file.status === "Parsing");
+}
+
+function hasParsingExampleFiles() {
+  return uploadedExampleFiles.some((file) => file.status === "Parsing");
 }
 
 function titleFromFileName(name) {
@@ -1001,6 +1007,8 @@ function resetContextImports() {
 function resetDraftEdits() {
   editedDraft = null;
   draftHasUnsavedChanges = false;
+  isGeneratingDraft = false;
+  draftGenerationMessage = "";
 }
 
 function resetFollowUpVoiceNotes() {
@@ -1248,6 +1256,97 @@ async function ensureVoiceTranscriptionsReady() {
   renderFlow();
 }
 
+function selectedNotesForDraft() {
+  const scenarioNotes = getScenario().notes.map((note) => ({
+    id: note.id,
+    title: note.title,
+    role: note.role,
+    text: note.text,
+    transcriptionSource: "Sample transcript",
+  }));
+  const uploadedNotes = uploadedVoiceNotes
+    .filter((note) => note.transcriptionStatus !== "error" && note.transcriptionStatus !== "queued")
+    .map((note) => ({
+      id: note.id,
+      title: note.title,
+      role: note.uploaded ? "Uploaded voice note" : note.role,
+      text: note.text,
+      transcriptionSource: note.transcriptionSource || "Uploaded transcript",
+    }));
+  return [...scenarioNotes, ...uploadedNotes].filter((note) => selectedVoiceNoteIds.has(note.id) && note.text);
+}
+
+async function generateTraceableDraft() {
+  const notes = selectedNotesForDraft();
+  if (!notes.length) {
+    throw new Error("Select at least one transcribed voice note before generating the draft.");
+  }
+
+  refreshContextPrimingWords();
+  const response = await fetch("/api/draft", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      projectIntent,
+      outputShape: projectOutputShape,
+      domain: getScenario().label,
+      domainContext: contextInput,
+      primingWords: contextPrimingWords,
+      targetStructure: targetStructureItems(),
+      notes,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Could not generate the traceable draft.");
+  }
+
+  const paragraphs = Array.isArray(payload.paragraphs)
+    ? payload.paragraphs
+        .map((paragraph) => ({
+          text: String(paragraph.text || "").trim(),
+          sources: Array.isArray(paragraph.sources) && paragraph.sources.length ? paragraph.sources : ["AI inference"],
+        }))
+        .filter((paragraph) => paragraph.text)
+    : [];
+  if (!paragraphs.length) {
+    throw new Error("The draft model returned no usable paragraphs.");
+  }
+
+  editedDraft = {
+    title: String(payload.title || getDraftTitle()).trim() || getDraftTitle(),
+    paragraphs,
+  };
+  draftHasUnsavedChanges = false;
+  draftGenerationMessage = `Generated traceable draft with ${payload.model || "OpenAI mini model"}.`;
+}
+
+async function ensureGeneratedDraftReady() {
+  if (editedDraft) return;
+  isGeneratingDraft = true;
+  draftGenerationMessage = "Generating a traceable draft from the transcribed notes and target document schema...";
+  renderFlow();
+  try {
+    await generateTraceableDraft();
+  } catch (error) {
+    const scenario = getScenario();
+    editedDraft = {
+      title: getDraftTitle(),
+      paragraphs: scenario.draft.map((paragraph) => ({
+        text: paragraph.text,
+        sources: paragraph.sources,
+      })),
+    };
+    draftGenerationMessage = `${error.message || "Draft generation failed."} Showing the prototype fallback draft.`;
+  } finally {
+    isGeneratingDraft = false;
+    renderFlow();
+  }
+}
+
 function renderVoiceNoteRow(note) {
   const isSelected = selectedVoiceNoteIds.has(note.id);
   const isPlaying = playingVoiceNoteId === note.id;
@@ -1456,7 +1555,14 @@ function renderFlow() {
   els.flowProgressBar.style.width = `${((flowStep + 1) / flowSteps.length) * 100}%`;
   els.flowBackButton.disabled = flowStep === 0;
   els.flowNextButton.textContent = flowStep === flowSteps.length - 1 ? "Back to homepage" : "Continue";
-  els.flowNextButton.disabled = isTranscribingVoiceNotes;
+  if (flowStep === 3 && isGeneratingDraft) {
+    els.flowNextButton.textContent = "Generating draft...";
+  } else if (flowStep === 3 && isTranscribingVoiceNotes) {
+    els.flowNextButton.textContent = "Transcribing notes...";
+  } else if (flowStep === 2 && hasParsingExampleFiles()) {
+    els.flowNextButton.textContent = "Parsing examples...";
+  }
+  els.flowNextButton.disabled = isTranscribingVoiceNotes || isGeneratingDraft;
 
   if (document.activeElement !== els.flowIntent) {
     els.flowIntent.value = projectIntent;
@@ -1476,6 +1582,9 @@ function renderFlow() {
     (file) => file.status === "Parsing",
   ).length;
   if (flowStep === 3 && contextParsingCount) {
+    els.flowNextButton.disabled = true;
+  }
+  if (flowStep === 2 && hasParsingExampleFiles()) {
     els.flowNextButton.disabled = true;
   }
   const csvLabel = `${uploadedContextFiles.csv.length} CSV glossar${uploadedContextFiles.csv.length === 1 ? "y" : "ies"}`;
@@ -1574,6 +1683,7 @@ function renderFlowDraft() {
   `;
   if (!draftHasUnsavedChanges && !els.flowExportStatus.textContent.includes("Exported")) {
     els.flowExportStatus.textContent =
+      draftGenerationMessage ||
       "Edit inline; exports use the current on-screen draft. Traceability appears as footnotes in this viewer and export.";
   }
 }
@@ -2036,12 +2146,14 @@ els.flowOutputShape.addEventListener("change", (event) => {
     isOtherOutputShape = false;
     projectOutputShape = event.target.value;
   }
+  resetDraftEdits();
   syncFlowOtherOutput();
   render();
 });
 els.flowOtherOutput.addEventListener("input", (event) => {
   isOtherOutputShape = true;
   projectOutputShape = event.target.value.trim();
+  resetDraftEdits();
   syncFlowOtherOutput();
 });
 els.startIntent.addEventListener("input", (event) => {
@@ -2049,9 +2161,11 @@ els.startIntent.addEventListener("input", (event) => {
 });
 els.flowIntent.addEventListener("input", (event) => {
   projectIntent = event.target.value;
+  resetDraftEdits();
 });
 els.flowContextInput.addEventListener("input", (event) => {
   contextInput = event.target.value;
+  resetDraftEdits();
   renderFlow();
 });
 els.flowCsvGlossaryUpload.addEventListener("change", async (event) => {
@@ -2063,6 +2177,7 @@ els.flowCsvGlossaryUpload.addEventListener("change", async (event) => {
     terms: [],
     status: "Parsing",
   }));
+  resetDraftEdits();
   renderFlow();
   uploadedContextFiles.csv = await parseContextFiles(files, "csv");
   refreshContextPrimingWords();
@@ -2077,6 +2192,7 @@ els.flowMarkdownContextUpload.addEventListener("change", async (event) => {
     terms: [],
     status: "Parsing",
   }));
+  resetDraftEdits();
   renderFlow();
   uploadedContextFiles.markdown = await parseContextFiles(files, "markdown");
   refreshContextPrimingWords();
@@ -2104,6 +2220,7 @@ els.flowVoiceNotes.addEventListener("change", (event) => {
   } else {
     selectedVoiceNoteIds.delete(voiceId);
   }
+  resetDraftEdits();
   renderFlow();
 });
 els.flowVoiceNotes.addEventListener("click", (event) => {
@@ -2148,10 +2265,12 @@ els.flowVoiceUpload.addEventListener("change", async (event) => {
     };
   });
   isTranscribingVoiceNotes = false;
+  resetDraftEdits();
   renderFlow();
 });
 els.flowExampleLinks.addEventListener("input", (event) => {
   exampleLinksInput = event.target.value;
+  resetDraftEdits();
   renderFlow();
 });
 els.flowExampleUpload.addEventListener("change", async (event) => {
@@ -2162,6 +2281,7 @@ els.flowExampleUpload.addEventListener("change", async (event) => {
     sections: [],
     status: "Parsing",
   }));
+  resetDraftEdits();
   renderFlow();
 
   uploadedExampleFiles = await Promise.all(
@@ -2193,6 +2313,7 @@ els.flowExampleUpload.addEventListener("change", async (event) => {
       };
     }),
   );
+  resetDraftEdits();
   renderFlow();
 });
 els.flowExamples.addEventListener("click", (event) => {
@@ -2206,6 +2327,7 @@ els.flowExamples.addEventListener("click", (event) => {
   }
   activeSuggestedExampleId = exampleId;
   isExampleDrawerOpen = true;
+  resetDraftEdits();
   renderFlow();
 });
 els.closeExampleDrawer.addEventListener("click", () => {
@@ -2227,6 +2349,7 @@ els.exampleDrawerContent.addEventListener("click", (event) => {
   } else {
     selectedSuggestedExampleIds.add(exampleId);
   }
+  resetDraftEdits();
   renderFlow();
 });
 document.addEventListener("keydown", (event) => {
@@ -2290,12 +2413,17 @@ els.flowBackButton.addEventListener("click", () => {
 els.flowNextButton.addEventListener("click", async () => {
   const totalSteps = document.querySelectorAll(".flow-step").length;
   els.flowNextButton.disabled = true;
+  if (flowStep === 2 && hasParsingExampleFiles()) {
+    renderFlow();
+    return;
+  }
   if (flowStep === 3) {
     if (hasParsingContextFiles()) {
       renderFlow();
       return;
     }
     await ensureVoiceTranscriptionsReady();
+    await ensureGeneratedDraftReady();
   }
   if (flowStep === totalSteps - 1) {
     activeView = "home";
