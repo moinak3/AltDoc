@@ -2502,12 +2502,6 @@ select:focus {
   display: inline;
 }
 
-.draft-actions .is-dirty {
-  border-color: rgba(166, 98, 18, 0.45);
-  background: var(--amber-soft);
-  color: var(--amber);
-}
-
 .draft-paragraph {
   position: relative;
   padding: 10px 12px;

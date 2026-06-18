@@ -546,7 +546,6 @@ const els = {
   flowDraftBody: document.querySelector("#flowDraftBody"),
   flowDraftTitle: document.querySelector("#flowDraftTitle"),
   flowDraftFootnotes: document.querySelector("#flowDraftFootnotes"),
-  flowSaveDraftButton: document.querySelector("#flowSaveDraftButton"),
   flowDocxButton: document.querySelector("#flowDocxButton"),
   flowExportStatus: document.querySelector("#flowExportStatus"),
   flowScoreValue: document.querySelector("#flowScoreValue"),
@@ -1401,15 +1400,7 @@ function collectDraftFromEditor() {
 function markDraftDirty() {
   editedDraft = collectDraftFromEditor();
   draftHasUnsavedChanges = true;
-  els.flowExportStatus.textContent = "Unsaved edits. Save draft or export now to use the latest on-screen version.";
-  els.flowSaveDraftButton.classList.add("is-dirty");
-}
-
-function saveDraftEdits() {
-  editedDraft = collectDraftFromEditor();
-  draftHasUnsavedChanges = false;
-  els.flowSaveDraftButton.classList.remove("is-dirty");
-  els.flowExportStatus.textContent = "Draft saved. Exports will use the latest saved inline edits.";
+  els.flowExportStatus.textContent = "Edits are included automatically when you export this document.";
 }
 
 function getExportDraftDocument() {
@@ -1581,9 +1572,9 @@ function renderFlowDraft() {
       )
       .join("")}
   `;
-  els.flowSaveDraftButton.classList.toggle("is-dirty", draftHasUnsavedChanges);
-  if (!draftHasUnsavedChanges && !els.flowExportStatus.textContent.includes("saved")) {
-    els.flowExportStatus.textContent = "Edit inline, then save or export. Traceability appears as footnotes in this viewer and export.";
+  if (!draftHasUnsavedChanges && !els.flowExportStatus.textContent.includes("Exported")) {
+    els.flowExportStatus.textContent =
+      "Edit inline; exports use the current on-screen draft. Traceability appears as footnotes in this viewer and export.";
   }
 }
 
@@ -1877,8 +1868,8 @@ function triggerDraftDocxDownload() {
 
 function downloadDraftDocx() {
   triggerDraftDocxDownload();
+  draftHasUnsavedChanges = false;
   els.flowExportStatus.textContent = "Exported document as .docx with draft title, body, and source-traceability footnotes.";
-  els.flowSaveDraftButton.classList.remove("is-dirty");
 }
 
 function renderNotes() {
@@ -2091,7 +2082,6 @@ els.flowMarkdownContextUpload.addEventListener("change", async (event) => {
   refreshContextPrimingWords();
   renderFlow();
 });
-els.flowSaveDraftButton.addEventListener("click", saveDraftEdits);
 els.flowDraftTitle.addEventListener("input", markDraftDirty);
 els.flowDraftBody.addEventListener("input", (event) => {
   if (event.target.closest(".draft-editable")) {
